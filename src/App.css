@@ -1,0 +1,550 @@
+/* ---------------------------------------------------------------------------
+ * Layout shell
+ * ------------------------------------------------------------------------ */
+
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 28px 64px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Ward strip — folder-tab style ward switcher. Each ward is a separate
+ * dossier; the active tab reads as physically attached to the page below.
+ * ------------------------------------------------------------------------ */
+
+.wardstrip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin-bottom: -1px;
+  overflow-x: auto;
+}
+
+.wardtab {
+  font: 500 12.5px/1 var(--font-sans);
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  background: var(--weekend-wash);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 9px 16px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+}
+
+.wardtab:hover {
+  color: var(--ink);
+}
+
+.wardtab[data-active="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  border-color: var(--line-strong);
+  border-bottom: 1px solid var(--paper);
+}
+
+.wardtab-add {
+  font: 500 16px/1 var(--font-sans);
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  width: 30px;
+  height: 30px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.wardtab-add:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.wardtab-new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.wardtab-new input {
+  width: 150px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Masthead
+ * ------------------------------------------------------------------------ */
+
+.masthead {
+  border: 1px solid var(--line-strong);
+  border-top-width: 2px;
+  background: var(--surface);
+  padding: 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.masthead-id {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.masthead-step {
+  font: 500 15px/1 var(--font-mono);
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.masthead-step:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.masthead-title {
+  font: 600 36px/1 var(--font-display);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.masthead-title em {
+  font-style: italic;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.masthead-meta {
+  margin: 7px 0 0 46px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.masthead-meta .edited {
+  color: var(--flag);
+}
+
+.masthead-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Buttons — flat, structural. No gradients, no soft shadows.
+ * ------------------------------------------------------------------------ */
+
+.btn {
+  font: 500 12.5px/1 var(--font-sans);
+  letter-spacing: 0.01em;
+  padding: 9px 15px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--weekend-wash);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn.primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn.danger {
+  border-color: var(--flag);
+  color: var(--flag);
+}
+
+.btn.danger:hover {
+  background: var(--flag-soft);
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: none;
+}
+
+.btn.ghost:hover {
+  background: var(--weekend-wash);
+}
+
+.btn.small {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Issues strip — read as marginalia / a redline note, not a rounded alert.
+ * ------------------------------------------------------------------------ */
+
+.notice {
+  border-left: 3px solid var(--flag);
+  background: var(--flag-soft);
+  padding: 13px 18px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.notice.good {
+  border-left-color: var(--good);
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.notice h3 {
+  font: 600 12.5px/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--flag);
+  margin-bottom: 8px;
+}
+
+.notice.good h3 {
+  color: var(--good);
+}
+
+.notice ul {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink-soft);
+}
+
+.notice li {
+  margin: 3px 0;
+}
+
+.notice.subtle {
+  border-left-color: var(--line-strong);
+  background: var(--weekend-wash);
+}
+
+.notice.subtle h3 {
+  color: var(--ink-soft);
+}
+
+/* ---------------------------------------------------------------------------
+ * Roster board
+ * ------------------------------------------------------------------------ */
+
+.board {
+  border: 1px solid var(--line-strong);
+  border-top: none;
+  overflow: auto;
+  max-height: 64vh;
+  background: var(--surface);
+}
+
+.gridtable {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.gridtable th,
+.gridtable td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.gt-name {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface);
+  text-align: left;
+  padding: 0 12px;
+  min-width: 176px;
+  max-width: 176px;
+  font: 500 12.5px/1 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 32px;
+  border-right: 1px solid var(--line-strong);
+}
+
+.gt-head th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--surface);
+  height: 38px;
+  min-width: 30px;
+  font: 600 12px/1 var(--font-mono);
+  padding: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.gt-head .gt-name {
+  z-index: 5;
+  font: 600 11px/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.gt-dow {
+  display: block;
+  font: 400 9px/1 var(--font-sans);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.gt-weekend {
+  background: var(--weekend-wash) !important;
+}
+
+.gt-cell {
+  width: 30px;
+  height: 30px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+  font: 600 11px/1 var(--font-mono);
+  border: none;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.gt-cell.flagged {
+  box-shadow: inset 0 -3px 0 var(--flag);
+}
+
+.gt-tally td {
+  background: var(--surface);
+  height: 27px;
+  text-align: center;
+  font: 500 11px/1 var(--font-mono);
+  color: var(--muted);
+}
+
+.gt-tally .gt-name {
+  font: 500 10.5px/1 var(--font-sans);
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom: none;
+}
+
+.gt-short {
+  color: var(--flag);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+ * Legend
+ * ------------------------------------------------------------------------ */
+
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 16px 0 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  display: inline-block;
+  font: 700 8.5px/16px var(--font-mono);
+  text-align: center;
+}
+
+.legend-status {
+  margin-left: auto;
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Section tabs (Staff / Rules / Leave / Balance)
+ * ------------------------------------------------------------------------ */
+
+.tabstrip {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line-strong);
+  margin-bottom: 20px;
+}
+
+.tab {
+  font: 500 12.5px/1 var(--font-sans);
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 10px 4px;
+  margin-right: 18px;
+  cursor: pointer;
+  position: relative;
+  top: 1px;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[data-active="true"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom: 2px solid var(--ink);
+}
+
+/* ---------------------------------------------------------------------------
+ * Panels
+ * ------------------------------------------------------------------------ */
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 32px;
+}
+
+.panel {
+  border-top: 2px solid var(--ink);
+  padding-top: 14px;
+}
+
+.panel.wide {
+  grid-column: 1 / -1;
+}
+
+.panel h3 {
+  font: 600 13px/1 var(--font-sans);
+  margin-bottom: 4px;
+}
+
+.panel-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 6px 0 14px;
+  max-width: 62ch;
+}
+
+.datatable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.datatable th {
+  text-align: left;
+  font: 600 10.5px/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 0 8px 8px 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.datatable td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+}
+
+.datatable td.label {
+  font-family: var(--font-sans);
+}
+
+.datatable td.num {
+  text-align: right;
+}
+
+.field {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.field:focus-visible {
+  border-color: var(--ink);
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.row.tight {
+  margin-bottom: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty {
+  border: 1px dashed var(--line);
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .wardtab,
+  .tab {
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+}

@@ -8,11 +8,15 @@ const rosterId = (unitId: string, year: number, month: number) => `${unitId}|${m
 
 /** Creates the first ward, seeded with the sample staff and default rules
  *  from ROSTER_APP_SPEC.md, so a brand-new install has a working example.
- *  Only ever runs once, when no ward exists yet. */
+ *  Only ever runs once, when no ward exists yet. The existence check and the
+ *  insert happen inside one transaction — Dexie/IndexedDB serializes
+ *  overlapping read-write transactions on the same table, so two calls
+ *  racing (e.g. React StrictMode's double effect invocation in dev) can't
+ *  both see zero wards and both seed one. */
 async function ensureSeeded(): Promise<void> {
-  const count = await db.units.count();
-  if (count > 0) return;
   await db.transaction("rw", db.units, db.staff, db.rules, async () => {
+    const count = await db.units.count();
+    if (count > 0) return;
     const unit: Unit = { id: uid(), name: "Ward 1" };
     await db.units.add(unit);
     await db.staff.bulkAdd(SEED_STAFF.map((s) => ({ id: uid(), unitId: unit.id, active: true, ...s })));

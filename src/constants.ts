@@ -1,14 +1,16 @@
 import type { LeaveCode, Rules, ShiftCode, ShiftDef, Staff } from "./types";
 
+// Colors reference the design tokens in index.css (single source of truth)
+// rather than hardcoding hex here.
 export const SHIFT: Record<ShiftCode, ShiftDef> = {
-  M: { code: "M", label: "Morning", bg: "#F6C453", fg: "#3A2A00", counts: "work" },
-  A: { code: "A", label: "Afternoon", bg: "#2F8F8A", fg: "#FFFFFF", counts: "work" },
-  N: { code: "N", label: "Night", bg: "#2B3A67", fg: "#FFFFFF", counts: "work" },
-  X: { code: "X", label: "Off", bg: "#E4E8ED", fg: "#5C6672", counts: "off" },
-  H: { code: "H", label: "Holiday off", bg: "#CBB7EC", fg: "#2E1E52", counts: "off" },
-  AL: { code: "AL", label: "Annual leave", bg: "#FFFFFF", fg: "#5C6672", counts: "leave" },
-  ML: { code: "ML", label: "Maternity leave", bg: "#FFFFFF", fg: "#5C6672", counts: "leave" },
-  SL: { code: "SL", label: "Study leave", bg: "#FFFFFF", fg: "#5C6672", counts: "leave" },
+  M: { code: "M", label: "Morning", bg: "var(--shift-m-bg)", fg: "var(--shift-m-fg)", counts: "work" },
+  A: { code: "A", label: "Afternoon", bg: "var(--shift-a-bg)", fg: "var(--shift-a-fg)", counts: "work" },
+  N: { code: "N", label: "Night", bg: "var(--shift-n-bg)", fg: "var(--shift-n-fg)", counts: "work" },
+  X: { code: "X", label: "Off", bg: "var(--shift-x-bg)", fg: "var(--shift-x-fg)", counts: "off" },
+  H: { code: "H", label: "Holiday off", bg: "var(--shift-h-bg)", fg: "var(--shift-h-fg)", counts: "off" },
+  AL: { code: "AL", label: "Annual leave", bg: "var(--surface)", fg: "var(--muted)", counts: "leave" },
+  ML: { code: "ML", label: "Maternity leave", bg: "var(--surface)", fg: "var(--muted)", counts: "leave" },
+  SL: { code: "SL", label: "Study leave", bg: "var(--surface)", fg: "var(--muted)", counts: "leave" },
 };
 
 export const LEAVE_CODES: LeaveCode[] = ["AL", "ML", "SL"];
