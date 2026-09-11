@@ -1,22 +1,13 @@
-import { useState } from "react";
 import type { Staff } from "../types";
 
 interface StaffPanelProps {
   staff: Staff[];
   onAdd: () => void;
-  onAddBulk: (names: string[]) => void;
   onUpdate: (id: string, patch: Partial<Omit<Staff, "id" | "unitId">>) => void;
   onRemove: (id: string) => void;
 }
 
-function parseNames(raw: string): string[] {
-  return raw
-    .split(/[\n,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-export function StaffPanel({ staff, onAdd, onAddBulk, onUpdate, onRemove }: StaffPanelProps) {
+export function StaffPanel({ staff, onAdd, onUpdate, onRemove }: StaffPanelProps) {
   return (
     <div className="panel wide">
       <h3>Staff</h3>
@@ -79,55 +70,6 @@ export function StaffPanel({ staff, onAdd, onAddBulk, onUpdate, onRemove }: Staf
       </table>
       <div className="row" style={{ marginTop: 12 }}>
         <button type="button" className="btn" onClick={onAdd}>Add staff</button>
-      </div>
-      <PasteStaff onAdd={onAddBulk} />
-    </div>
-  );
-}
-
-function PasteStaff({ onAdd }: { onAdd: (names: string[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const [raw, setRaw] = useState("");
-  const names = parseNames(raw);
-
-  if (!open) {
-    return (
-      <div className="row tight">
-        <button type="button" className="btn ghost small" onClick={() => setOpen(true)}>
-          Paste a staff list instead
-        </button>
-      </div>
-    );
-  }
-
-  const submit = () => {
-    if (names.length === 0) return;
-    onAdd(names);
-    setRaw("");
-    setOpen(false);
-  };
-
-  return (
-    <div className="stack" style={{ marginTop: 4, maxWidth: 420 }}>
-      <p className="panel-note" style={{ margin: 0 }}>
-        One name per line (or comma-separated) — pastes straight from a spreadsheet column. Sex,
-        fixed-morning, and night-eligible can be set per row afterwards.
-      </p>
-      <textarea
-        className="field"
-        rows={6}
-        autoFocus
-        placeholder={"Ama Serwaa\nKofi Boateng\nEsi Mensah"}
-        value={raw}
-        onChange={(e) => setRaw(e.target.value)}
-      />
-      <div className="row tight">
-        <button type="button" className="btn small" disabled={names.length === 0} onClick={submit}>
-          Add {names.length || ""} staff
-        </button>
-        <button type="button" className="btn ghost small" onClick={() => { setOpen(false); setRaw(""); }}>
-          Cancel
-        </button>
       </div>
     </div>
   );

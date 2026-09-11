@@ -92,11 +92,6 @@ export function useRosterState(unitId: string | null, year: number, month: numbe
   const updateStaff = repo.updateStaff;
   const removeStaff = repo.removeStaff;
 
-  const addStaffBulk = useCallback(
-    (names: string[]) => (unitId ? repo.addStaffBulk(unitId, names) : undefined),
-    [unitId],
-  );
-
   const updateRules = useCallback(
     (patch: Parameters<typeof repo.updateRules>[1]) => (unitId ? repo.updateRules(unitId, patch) : undefined),
     [unitId],
@@ -142,7 +137,6 @@ export function useRosterState(unitId: string | null, year: number, month: numbe
       cycleCell,
       exportCSV,
       addStaff,
-      addStaffBulk,
       updateStaff,
       removeStaff,
       updateRules,
