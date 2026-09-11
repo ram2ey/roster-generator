@@ -4,7 +4,6 @@ import { validate } from "./validation";
 import type { Rules, ShiftCode, Staff } from "../types";
 
 const RULES: Rules = {
-  unitId: "u1",
   minNight: 3,
   allowTwoMaleNight: true,
   minAfternoon: 3,
@@ -15,7 +14,7 @@ const RULES: Rules = {
 
 function makeStaff(n: number, sex: "M" | "F" = "F"): Staff[] {
   return Array.from({ length: n }, (_, i) => ({
-    id: `s${i + 1}`, unitId: "u1", name: `Staff ${i + 1}`, sex, fixedMorning: false, nightEligible: true, active: true,
+    id: `s${i + 1}`, name: `Staff ${i + 1}`, sex, fixedMorning: false, nightEligible: true, active: true,
   }));
 }
 

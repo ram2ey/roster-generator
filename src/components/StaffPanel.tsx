@@ -3,7 +3,7 @@ import type { Staff } from "../types";
 interface StaffPanelProps {
   staff: Staff[];
   onAdd: () => void;
-  onUpdate: (id: string, patch: Partial<Omit<Staff, "id" | "unitId">>) => void;
+  onUpdate: (id: string, patch: Partial<Omit<Staff, "id">>) => void;
   onRemove: (id: string) => void;
 }
 

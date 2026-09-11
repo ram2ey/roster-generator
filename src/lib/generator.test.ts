@@ -5,22 +5,22 @@ import { buildDays } from "./dateUtils";
 import { generateRoster } from "./generator";
 import { validate } from "./validation";
 
-const RULES: Rules = { unitId: "u1", ...structuredClone(DEFAULT_RULES) };
+const RULES: Rules = structuredClone(DEFAULT_RULES);
 
 // 4 fixed-morning staff (excluded from night/afternoon rotation, per the
 // staffing rule) plus 12 rotating staff who cover night and afternoon — the
 // "10-12 staff" pool size the spec (§7) says the greedy algorithm should
 // comfortably satisfy without backtracking. The prototype's smaller 8-person
-// SEED_STAFF sample is closer to the algorithm's documented limit and can
+// sample staff list is closer to the algorithm's documented limit and can
 // show shortfalls on a thin week — that is the known, accepted limitation
 // described in §7, not something these tests assert against.
 function fullPool(): Staff[] {
   const fixed = ["Francis", "Emmanuel", "Faustina", "Gertrude"].map((name, i) => ({
-    id: `fixed-${i}`, unitId: "u1", name, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
+    id: `fixed-${i}`, name, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
     fixedMorning: true, nightEligible: false, active: true,
   }));
   const rotating = Array.from({ length: 12 }, (_, i) => ({
-    id: `rot-${i}`, unitId: "u1", name: `Rotating ${i + 1}`, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
+    id: `rot-${i}`, name: `Rotating ${i + 1}`, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
     fixedMorning: false, nightEligible: true, active: true,
   }));
   return [...fixed, ...rotating];
@@ -31,7 +31,7 @@ describe("generateRoster — full staff pool", () => {
   const days = buildDays(year, month);
   const staff = fullPool();
   const roster = generateRoster({
-    unitId: "u1", year, month, staff, rules: RULES, leave: [], holidays: [],
+    year, month, staff, rules: RULES, leave: [], holidays: [],
     prevRoster: undefined, history: {}, seed: "fixed-test-seed",
   });
 
@@ -72,11 +72,11 @@ describe("generateRoster — thin staff pool", () => {
     // Only one night-eligible staff member — well below minNight (3) and
     // below the 2-male exception too.
     const staff: Staff[] = [
-      { id: "n1", unitId: "u1", name: "Solo Night", sex: "M", fixedMorning: false, nightEligible: true, active: true },
-      { id: "m1", unitId: "u1", name: "Fixed Morning", sex: "F", fixedMorning: true, nightEligible: false, active: true },
+      { id: "n1", name: "Solo Night", sex: "M", fixedMorning: false, nightEligible: true, active: true },
+      { id: "m1", name: "Fixed Morning", sex: "F", fixedMorning: true, nightEligible: false, active: true },
     ];
     const roster = generateRoster({
-      unitId: "u1", year, month, staff, rules: RULES, leave: [], holidays: [],
+      year, month, staff, rules: RULES, leave: [], holidays: [],
       prevRoster: undefined, history: {}, seed: "thin-pool-seed",
     });
 
@@ -91,9 +91,9 @@ describe("generateRoster — leave and holidays", () => {
   it("never overwrites approved leave", () => {
     const year = 2024, month = 3;
     const staff = fullPool();
-    const leave = [{ id: "l1", unitId: "u1", staffId: "rot-0", type: "AL" as const, start: "2024-03-05", end: "2024-03-09" }];
+    const leave = [{ id: "l1", staffId: "rot-0", type: "AL" as const, start: "2024-03-05", end: "2024-03-09" }];
     const roster = generateRoster({
-      unitId: "u1", year, month, staff, rules: RULES, leave, holidays: [],
+      year, month, staff, rules: RULES, leave, holidays: [],
       prevRoster: undefined, history: {}, seed: "leave-seed",
     });
     for (let d = 5; d <= 9; d++) {
@@ -106,9 +106,9 @@ describe("generateRoster — leave and holidays", () => {
     const staff = fullPool();
     // 2024-03-25 is a Monday, so a fixed-morning staff member would
     // otherwise be working "M" — the holiday should override that to "H".
-    const holidays = [{ id: "h1", unitId: "u1", date: "2024-03-25", name: "Test holiday" }];
+    const holidays = [{ id: "h1", date: "2024-03-25", name: "Test holiday" }];
     const roster = generateRoster({
-      unitId: "u1", year, month, staff, rules: RULES, leave: [], holidays,
+      year, month, staff, rules: RULES, leave: [], holidays,
       prevRoster: undefined, history: {}, seed: "holiday-seed",
     });
     expect(roster.grid["fixed-0"]["2024-03-25"]).toBe("H");

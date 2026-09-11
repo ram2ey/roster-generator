@@ -1,5 +1,10 @@
-// Core domain types, shared by the pure logic in lib/, the persistence layer
-// in data/, and the UI. Mirrors the entities in ROSTER_APP_SPEC.md §5.
+// Core domain types, shared by the pure logic in lib/, the API client in
+// data/, and the UI. Mirrors the entities in server/src/db/schema.ts.
+//
+// There is no client-side tenant/ward id anywhere in this file. Scoping to
+// one facility's data happens entirely server-side, derived from the
+// authenticated session — the frontend only ever sees its own account's
+// rows and never needs to say whose they are.
 
 export type WorkCode = "M" | "A" | "N";
 export type OffCode = "X" | "H";
@@ -14,14 +19,8 @@ export interface ShiftDef {
   counts: "work" | "off" | "leave";
 }
 
-export interface Unit {
-  id: string;
-  name: string;
-}
-
 export interface Staff {
   id: string;
-  unitId: string;
   name: string;
   sex: "M" | "F";
   fixedMorning: boolean;
@@ -31,7 +30,6 @@ export interface Staff {
 
 export interface Leave {
   id: string;
-  unitId: string;
   staffId: string;
   type: LeaveCode;
   start: string; // ISO date, inclusive
@@ -40,13 +38,11 @@ export interface Leave {
 
 export interface Holiday {
   id: string;
-  unitId: string;
   date: string; // ISO date
   name: string;
 }
 
 export interface Rules {
-  unitId: string;
   minNight: number;
   allowTwoMaleNight: boolean;
   minAfternoon: number;
@@ -57,12 +53,10 @@ export interface Rules {
 
 // One row per assignable day: staffId -> code. Kept as a nested object
 // (rather than one DB row per cell, per spec §5) because the whole grid is
-// read and written as a unit inside a single browser.
+// read and written as a unit.
 export type RosterGrid = Record<string, Record<string, ShiftCode>>;
 
 export interface Roster {
-  id: string; // `${unitId}|${year}-${month}`
-  unitId: string;
   year: number;
   month: number;
   grid: RosterGrid;

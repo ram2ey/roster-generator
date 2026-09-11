@@ -1,16 +1,16 @@
 import { useState } from "react";
 import "./App.css";
+import { AuthScreen } from "./components/AuthScreen";
 import { BalancePanel } from "./components/BalancePanel";
 import { IssuesStrip } from "./components/IssuesStrip";
 import { LeavePanel } from "./components/LeavePanel";
 import { RosterBoard } from "./components/RosterBoard";
 import { RulesPanel } from "./components/RulesPanel";
 import { StaffPanel } from "./components/StaffPanel";
-import { WardSwitcher } from "./components/WardSwitcher";
 import { MONTHS, SHIFT } from "./constants";
-import { nextMonth, prevMonth } from "./lib/dateUtils";
+import { useAuth } from "./hooks/useAuth";
 import { useRosterState } from "./hooks/useRosterState";
-import { useUnits } from "./hooks/useUnits";
+import { nextMonth, prevMonth } from "./lib/dateUtils";
 
 type Tab = "staff" | "rules" | "leave" | "balance";
 
@@ -22,29 +22,33 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const { ready, units, unitId, setUnitId, createUnit } = useUnits();
+  const auth = useAuth();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [tab, setTab] = useState<Tab>("staff");
 
+  const authed = auth.status === "authed";
   const {
     loading, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, actions,
-  } = useRosterState(unitId, year, month);
+  } = useRosterState(year, month, authed);
 
-  if (!ready || (unitId && loading) || !rules) {
+  if (auth.status === "loading") {
     return (
       <div className="app">
-        <div className="empty">Loading roster book…</div>
+        <div className="empty">Loading…</div>
       </div>
     );
   }
 
-  if (!unitId) {
+  if (auth.status === "anon") {
+    return <AuthScreen error={auth.error} onLogin={auth.login} onSignup={auth.signup} />;
+  }
+
+  if (loading || !rules) {
     return (
       <div className="app">
-        <WardSwitcher units={units} unitId={unitId} onSelect={setUnitId} onCreate={createUnit} />
-        <div className="empty">Add a ward to get started.</div>
+        <div className="empty">Loading roster book…</div>
       </div>
     );
   }
@@ -57,8 +61,6 @@ export default function App() {
 
   return (
     <div className="app">
-      <WardSwitcher units={units} unitId={unitId} onSelect={setUnitId} onCreate={createUnit} />
-
       <header className="masthead">
         <div>
           <div className="masthead-id">
@@ -79,6 +81,9 @@ export default function App() {
           {roster && (
             <button type="button" className="btn" onClick={actions.exportCSV}>Download CSV</button>
           )}
+          <button type="button" className="btn ghost small" onClick={auth.logout}>
+            Sign out ({auth.email})
+          </button>
         </div>
       </header>
 
@@ -131,7 +136,6 @@ export default function App() {
             onUpdateRules={actions.updateRules}
             onAddHoliday={actions.addHoliday}
             onRemoveHoliday={actions.removeHoliday}
-            onClearWard={actions.clearUnitData}
           />
         )}
         {tab === "leave" && (

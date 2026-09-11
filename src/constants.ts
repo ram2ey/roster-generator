@@ -1,4 +1,4 @@
-import type { LeaveCode, Rules, ShiftCode, ShiftDef, Staff } from "./types";
+import type { LeaveCode, Rules, ShiftCode, ShiftDef } from "./types";
 
 // Colors reference the design tokens in index.css (single source of truth)
 // rather than hardcoding hex here.
@@ -22,7 +22,10 @@ export function isLeaveCode(c: ShiftCode | undefined): c is LeaveCode {
 // Click order for manual cell edits.
 export const CYCLE: ShiftCode[] = ["M", "A", "N", "X", "H"];
 
-export const DEFAULT_RULES: Omit<Rules, "unitId"> = {
+// Mirrors the defaults a new account is created with server-side
+// (server/src/routes/auth.ts) — kept here for tests over the pure
+// generator/validation logic, which need some Rules to run against.
+export const DEFAULT_RULES: Rules = {
   minNight: 3,
   allowTwoMaleNight: true, // "least 3, or 2 males (Sangmuah specific)"
   minAfternoon: 3,
@@ -30,23 +33,6 @@ export const DEFAULT_RULES: Omit<Rules, "unitId"> = {
   nightBlockLengths: [3, 4], // 3 nights -> 2 off, 4 nights -> 3 off
   offForBlock: { 3: 2, 4: 3 },
 };
-
-// The four names in the source document are treated as the fixed-morning
-// team (Mon-Fri). Everyone else rotates. Both flags are editable in the app.
-export const SEED_STAFF: Array<Pick<Staff, "name" | "sex" | "fixedMorning" | "nightEligible">> = [
-  { name: "Francis Adjei Ayim", sex: "M", fixedMorning: true, nightEligible: false },
-  { name: "Emmanuel Plange Ogoe", sex: "M", fixedMorning: true, nightEligible: false },
-  { name: "Faustina Mintah", sex: "F", fixedMorning: true, nightEligible: false },
-  { name: "Gertrude Opoku", sex: "F", fixedMorning: true, nightEligible: false },
-  { name: "Rotating staff 1", sex: "M", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 2", sex: "M", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 3", sex: "M", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 4", sex: "F", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 5", sex: "F", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 6", sex: "F", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 7", sex: "F", fixedMorning: false, nightEligible: true },
-  { name: "Rotating staff 8", sex: "M", fixedMorning: false, nightEligible: true },
-];
 
 export const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

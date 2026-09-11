@@ -3,12 +3,12 @@ import type { History, Roster, StaffTally } from "../types";
 const emptyTally = (): StaffTally => ({ M: 0, A: 0, N: 0, X: 0, H: 0, weekendOff: 0, months: 0 });
 
 /**
- * Tallies every saved roster (for one unit) into per-staff totals. This is
- * the cross-month "memory" that keeps consecutive months from looking the
- * same: whoever carries the lightest night load so far is picked first next
- * time. See ROSTER_APP_SPEC.md "Why months differ".
+ * Tallies every saved roster into per-staff totals. This is the cross-month
+ * "memory" that keeps consecutive months from looking the same: whoever
+ * carries the lightest night load so far is picked first next time. See
+ * ROSTER_APP_SPEC.md "Why months differ".
  */
-export function buildHistory(rosters: Roster[], excludeId?: string): History {
+export function buildHistory(rosters: Roster[], exclude?: { year: number; month: number }): History {
   const tally: History = {};
   const touch = (id: string) => {
     if (!tally[id]) tally[id] = emptyTally();
@@ -16,7 +16,7 @@ export function buildHistory(rosters: Roster[], excludeId?: string): History {
   };
 
   rosters.forEach((roster) => {
-    if (roster.id === excludeId || !roster.grid) return;
+    if ((exclude && roster.year === exclude.year && roster.month === exclude.month) || !roster.grid) return;
     Object.entries(roster.grid).forEach(([staffId, row]) => {
       const t = touch(staffId);
       t.months += 1;

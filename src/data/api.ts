@@ -1,0 +1,87 @@
+import type { Holiday, Leave, Roster, Rules, Staff } from "../types";
+
+// Same-origin: the backend serves this app's own static build, so there is
+// no separate API host and no CORS to configure.
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) message = body.error;
+    } catch {
+      // body wasn't JSON — fall back to statusText
+    }
+    throw new ApiError(res.status, message);
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+/* -- Auth ------------------------------------------------------------- */
+
+export const signup = (email: string, password: string) =>
+  request<{ email: string }>("/api/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) });
+
+export const login = (email: string, password: string) =>
+  request<{ email: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+
+export const logout = () => request<{ ok: true }>("/api/auth/logout", { method: "POST" });
+
+export const me = () => request<{ email: string }>("/api/auth/me");
+
+/* -- Staff -------------------------------------------------------------- */
+
+export const listStaff = () => request<Staff[]>("/api/staff");
+
+export const addStaff = (data: Omit<Staff, "id">) =>
+  request<Staff>("/api/staff", { method: "POST", body: JSON.stringify(data) });
+
+export const updateStaff = (id: string, patch: Partial<Omit<Staff, "id">>) =>
+  request<{ ok: true }>(`/api/staff/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+
+export const removeStaff = (id: string) => request<{ ok: true }>(`/api/staff/${id}`, { method: "DELETE" });
+
+/* -- Rules ---------------------------------------------------------------- */
+
+export const getRules = () => request<Rules>("/api/rules");
+
+export const updateRules = (patch: Partial<Rules>) =>
+  request<{ ok: true }>("/api/rules", { method: "PATCH", body: JSON.stringify(patch) });
+
+/* -- Holidays ------------------------------------------------------------- */
+
+export const listHolidays = () => request<Holiday[]>("/api/holidays");
+
+export const addHoliday = (date: string, name: string) =>
+  request<Holiday>("/api/holidays", { method: "POST", body: JSON.stringify({ date, name }) });
+
+export const removeHoliday = (id: string) => request<{ ok: true }>(`/api/holidays/${id}`, { method: "DELETE" });
+
+/* -- Leave ---------------------------------------------------------------- */
+
+export const listLeave = () => request<Leave[]>("/api/leave");
+
+export const addLeave = (data: Omit<Leave, "id">) =>
+  request<Leave>("/api/leave", { method: "POST", body: JSON.stringify(data) });
+
+export const removeLeave = (id: string) => request<{ ok: true }>(`/api/leave/${id}`, { method: "DELETE" });
+
+/* -- Rosters ---------------------------------------------------------------- */
+
+export const listRosters = () => request<Roster[]>("/api/rosters");
+
+export const saveRoster = (year: number, month: number, data: Omit<Roster, "year" | "month">) =>
+  request<Roster>(`/api/rosters/${year}/${month}`, { method: "PUT", body: JSON.stringify(data) });

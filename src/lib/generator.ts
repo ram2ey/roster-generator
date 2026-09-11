@@ -38,7 +38,6 @@ export function readCarry(prevRoster: Roster | undefined, prevDays: DayInfo[], r
 }
 
 export interface GenerateRosterInput {
-  unitId: string;
   year: number;
   month: number;
   staff: Staff[];
@@ -51,7 +50,7 @@ export interface GenerateRosterInput {
 }
 
 export function generateRoster({
-  unitId, year, month, staff, rules, leave, holidays, prevRoster, history, seed,
+  year, month, staff, rules, leave, holidays, prevRoster, history, seed,
 }: GenerateRosterInput): Roster {
   const days = buildDays(year, month);
   const holidaySet = new Set(holidays.map((h) => h.date));
@@ -219,8 +218,6 @@ export function generateRoster({
   });
 
   return {
-    id: `${unitId}|${year}-${String(month).padStart(2, "0")}`,
-    unitId,
     year,
     month,
     grid,

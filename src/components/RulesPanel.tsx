@@ -4,13 +4,12 @@ import type { Holiday, Rules } from "../types";
 interface RulesPanelProps {
   rules: Rules;
   holidays: Holiday[];
-  onUpdateRules: (patch: Partial<Omit<Rules, "unitId">>) => void;
+  onUpdateRules: (patch: Partial<Rules>) => void;
   onAddHoliday: (date: string, name: string) => void;
   onRemoveHoliday: (id: string) => void;
-  onClearWard: () => void;
 }
 
-export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRemoveHoliday, onClearWard }: RulesPanelProps) {
+export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRemoveHoliday }: RulesPanelProps) {
   return (
     <>
       <div className="panel">
@@ -70,19 +69,6 @@ export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRem
           ))}
         </div>
         <HolidayAdd onAdd={onAddHoliday} />
-        <div style={{ marginTop: 28, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-          <button
-            type="button"
-            className="btn danger"
-            onClick={() => {
-              if (window.confirm("Delete every saved roster, staff member, and rule for this ward? This can't be undone.")) {
-                onClearWard();
-              }
-            }}
-          >
-            Clear this ward
-          </button>
-        </div>
       </div>
     </>
   );
