@@ -53,9 +53,6 @@ export const me = () => request<{ email: string }>("/api/auth/me");
 
 export const listStaff = () => request<Staff[]>("/api/staff");
 
-export const addStaff = (data: Omit<Staff, "id">) =>
-  request<Staff>("/api/staff", { method: "POST", body: JSON.stringify(data) });
-
 export const addStaffBulk = (names: string[]) =>
   request<Staff[]>("/api/staff/bulk", { method: "POST", body: JSON.stringify({ names }) });
 

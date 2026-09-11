@@ -3,7 +3,6 @@ import type { Staff } from "../types";
 
 interface StaffPanelProps {
   staff: Staff[];
-  onAdd: () => void;
   onAddBulk: (names: string[]) => void;
   onUpdate: (id: string, patch: Partial<Omit<Staff, "id">>) => void;
   onRemove: (id: string) => void;
@@ -16,7 +15,13 @@ function parseNames(raw: string): string[] {
     .filter(Boolean);
 }
 
-export function StaffPanel({ staff, onAdd, onAddBulk, onUpdate, onRemove }: StaffPanelProps) {
+export function StaffPanel({ staff, onAddBulk, onUpdate, onRemove }: StaffPanelProps) {
+  const removeWithConfirm = (s: Staff) => {
+    if (window.confirm(`Remove ${s.name || "this staff member"}? This can't be undone.`)) {
+      onRemove(s.id);
+    }
+  };
+
   return (
     <div className="panel wide">
       <h3>Staff</h3>
@@ -69,7 +74,7 @@ export function StaffPanel({ staff, onAdd, onAddBulk, onUpdate, onRemove }: Staf
                 />
               </td>
               <td>
-                <button type="button" className="btn danger small" onClick={() => onRemove(s.id)}>
+                <button type="button" className="btn danger small" onClick={() => removeWithConfirm(s)}>
                   Remove
                 </button>
               </td>
@@ -77,46 +82,30 @@ export function StaffPanel({ staff, onAdd, onAddBulk, onUpdate, onRemove }: Staf
           ))}
         </tbody>
       </table>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button type="button" className="btn" onClick={onAdd}>Add staff</button>
-      </div>
-      <PasteStaff onAdd={onAddBulk} />
+      <AddStaff onAdd={onAddBulk} />
     </div>
   );
 }
 
-function PasteStaff({ onAdd }: { onAdd: (names: string[]) => void }) {
-  const [open, setOpen] = useState(false);
+function AddStaff({ onAdd }: { onAdd: (names: string[]) => void }) {
   const [raw, setRaw] = useState("");
   const names = parseNames(raw);
-
-  if (!open) {
-    return (
-      <div className="row tight">
-        <button type="button" className="btn ghost small" onClick={() => setOpen(true)}>
-          Paste a staff list instead
-        </button>
-      </div>
-    );
-  }
 
   const submit = () => {
     if (names.length === 0) return;
     onAdd(names);
     setRaw("");
-    setOpen(false);
   };
 
   return (
-    <div className="stack" style={{ marginTop: 4, maxWidth: 420 }}>
+    <div className="stack" style={{ marginTop: 12, maxWidth: 420 }}>
       <p className="panel-note" style={{ margin: 0 }}>
-        One name per line (or comma-separated) — pastes straight from a spreadsheet column. Sex,
-        fixed-morning, and night-eligible can be set per row afterwards.
+        Add staff — one name per line (or comma-separated). Everyone lands with the same rotating
+        defaults; sex, fixed-morning, and night-eligible can be set per row above afterward.
       </p>
       <textarea
         className="field"
-        rows={6}
-        autoFocus
+        rows={3}
         placeholder={"Ama Serwaa\nKofi Boateng\nEsi Mensah"}
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
@@ -124,9 +113,6 @@ function PasteStaff({ onAdd }: { onAdd: (names: string[]) => void }) {
       <div className="row tight">
         <button type="button" className="btn small" disabled={names.length === 0} onClick={submit}>
           Add {names.length || ""} staff
-        </button>
-        <button type="button" className="btn ghost small" onClick={() => { setOpen(false); setRaw(""); }}>
-          Cancel
         </button>
       </div>
     </div>
