@@ -14,7 +14,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    // Only set Content-Type when there's actually a body to describe — a
+    // bodyless DELETE (removeStaff, removeHoliday, removeLeave) sent with
+    // this header anyway hits Fastify's default JSON parser, which treats
+    // "Content-Type: application/json" plus zero body bytes as an error
+    // (FST_ERR_CTP_EMPTY_JSON_BODY, a 400) rather than "no body". That 400
+    // was silently swallowed here (nothing awaits/catches these calls at
+    // the button level), so every delete button looked like it did nothing.
+    headers: { ...(init?.body ? { "Content-Type": "application/json" } : {}), ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
     let message = res.statusText;
