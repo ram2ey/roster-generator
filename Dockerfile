@@ -36,5 +36,5 @@ COPY server/drizzle ./server/drizzle
 COPY --from=frontend-build /app/dist ./dist
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1
 CMD ["sh", "-c", "node server/dist/db/migrate.js && node server/dist/index.js"]
