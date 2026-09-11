@@ -24,6 +24,7 @@
   max-width: 360px;
   border-top: 2px solid var(--ink);
   padding-top: 20px;
+  text-align: center;
 }
 
 .authcard-title {
@@ -52,6 +53,14 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
+}
+
+.masthead-brand {
+  font: 600 11px/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 6px;
 }
 
 .masthead-id {

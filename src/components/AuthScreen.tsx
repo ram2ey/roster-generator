@@ -28,7 +28,7 @@ export function AuthScreen({ error, onLogin, onSignup }: AuthScreenProps) {
   return (
     <div className="authshell">
       <div className="authcard">
-        <h1 className="authcard-title">Duty Roster</h1>
+        <h1 className="authcard-title">Roster Generator</h1>
         <p className="panel-note" style={{ marginBottom: 20 }}>
           {mode === "login" ? "Sign in to your ward's roster." : "Create an account for your ward or facility."}
         </p>

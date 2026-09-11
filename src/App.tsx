@@ -63,6 +63,7 @@ export default function App() {
     <div className="app">
       <header className="masthead">
         <div>
+          <p className="masthead-brand">Roster Generator</p>
           <div className="masthead-id">
             <button type="button" className="masthead-step" onClick={() => step(-1)} aria-label="Previous month">‹</button>
             <h1 className="masthead-title">{MONTHS[month - 1]} {year}</h1>
