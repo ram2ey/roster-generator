@@ -91,6 +91,7 @@ export function useRosterState(year: number, month: number, ready: boolean) {
   }, [roster, days, staff, year, month]);
 
   const addStaff = useCallback(async (data: Omit<Staff, "id">) => { await api.addStaff(data); await reload(); }, [reload]);
+  const addStaffBulk = useCallback(async (names: string[]) => { await api.addStaffBulk(names); await reload(); }, [reload]);
   const updateStaff = useCallback(
     async (id: string, patch: Partial<Omit<Staff, "id">>) => { await api.updateStaff(id, patch); await reload(); },
     [reload],
@@ -128,6 +129,7 @@ export function useRosterState(year: number, month: number, ready: boolean) {
       cycleCell,
       exportCSV,
       addStaff,
+      addStaffBulk,
       updateStaff,
       removeStaff,
       updateRules,

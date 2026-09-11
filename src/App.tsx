@@ -125,6 +125,7 @@ export default function App() {
           <StaffPanel
             staff={staff}
             onAdd={() => actions.addStaff({ name: "New staff", sex: "F", fixedMorning: false, nightEligible: true, active: true })}
+            onAddBulk={actions.addStaffBulk}
             onUpdate={actions.updateStaff}
             onRemove={actions.removeStaff}
           />

@@ -26,6 +26,24 @@ export async function staffRoutes(app: FastifyInstance) {
     return row;
   });
 
+  // Bulk-create from a pasted name list. Everyone lands with the same
+  // rotating-staff defaults as a single add (sex/fixed-morning/night
+  // eligible aren't in a plain name list) — set per row afterwards.
+  app.post<{ Body: { names: string[] } }>("/api/staff/bulk", async (request, reply) => {
+    const names = (request.body?.names ?? [])
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .slice(0, 200);
+    if (names.length === 0) return reply.code(400).send({ error: "No names given." });
+
+    const rows = names.map((name) => ({
+      id: randomUUID(), facilityId: request.facilityId!, name,
+      sex: "F" as const, fixedMorning: false, nightEligible: true, active: true,
+    }));
+    await db.insert(staff).values(rows);
+    return rows;
+  });
+
   app.patch<{ Params: { id: string }; Body: Partial<StaffBody> }>("/api/staff/:id", async (request, reply) => {
     const result = await db.update(staff)
       .set(request.body)

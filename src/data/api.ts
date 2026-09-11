@@ -49,6 +49,9 @@ export const listStaff = () => request<Staff[]>("/api/staff");
 export const addStaff = (data: Omit<Staff, "id">) =>
   request<Staff>("/api/staff", { method: "POST", body: JSON.stringify(data) });
 
+export const addStaffBulk = (names: string[]) =>
+  request<Staff[]>("/api/staff/bulk", { method: "POST", body: JSON.stringify({ names }) });
+
 export const updateStaff = (id: string, patch: Partial<Omit<Staff, "id">>) =>
   request<{ ok: true }>(`/api/staff/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 
