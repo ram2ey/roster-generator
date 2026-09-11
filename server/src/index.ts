@@ -9,6 +9,15 @@ import { rosterRoutes } from "./routes/rosters.js";
 import { rulesRoutes } from "./routes/rules.js";
 import { staffRoutes } from "./routes/staff.js";
 
+// Fail loudly and immediately if a required secret is missing, rather than
+// starting "successfully" and then throwing deep inside the first
+// login/signup request — that failure mode is hard to tell apart from a
+// real bug and only shows up once someone tries to sign in.
+if (!process.env.SESSION_SECRET) {
+  console.error("SESSION_SECRET is not set — refusing to start.");
+  process.exit(1);
+}
+
 const app = Fastify({ logger: true, trustProxy: true });
 
 app.get("/healthz", async () => ({ ok: true }));
