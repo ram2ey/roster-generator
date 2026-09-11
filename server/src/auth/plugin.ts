@@ -12,8 +12,16 @@ declare module "fastify" {
 
 /** Reads the session cookie on every request and resolves it to a
  *  facilityId (or null). Nothing downstream should ever trust a
- *  client-supplied facility/tenant id — this is the only source. */
-export async function authPlugin(app: FastifyInstance) {
+ *  client-supplied facility/tenant id — this is the only source.
+ *
+ *  Call this directly (`await setupAuth(app)`), not via `app.register(...)`.
+ *  `register` creates an encapsulated child scope in Fastify, and everything
+ *  set up in here — the cookie plugin, the facilityId decorator, the
+ *  onRequest hook — would then only be visible inside that one scope, not to
+ *  the sibling route plugins (authRoutes, staffRoutes, ...) that actually
+ *  need it. Calling it as a plain function applies all of it to the same
+ *  `app` instance the caller passes in, with no extra scope in between. */
+export async function setupAuth(app: FastifyInstance) {
   await app.register(cookie);
 
   app.decorateRequest("facilityId", null);

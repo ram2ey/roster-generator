@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
-import { authPlugin } from "./auth/plugin.js";
+import { setupAuth } from "./auth/plugin.js";
 import { authRoutes } from "./routes/auth.js";
 import { holidayRoutes } from "./routes/holidays.js";
 import { leaveRoutes } from "./routes/leave.js";
@@ -22,7 +22,9 @@ const app = Fastify({ logger: true, trustProxy: true });
 
 app.get("/healthz", async () => ({ ok: true }));
 
-await app.register(authPlugin);
+// Not app.register(setupAuth) — see the comment on setupAuth for why that
+// would silently break auth for every other route.
+await setupAuth(app);
 await app.register(authRoutes);
 await app.register(staffRoutes);
 await app.register(leaveRoutes);
