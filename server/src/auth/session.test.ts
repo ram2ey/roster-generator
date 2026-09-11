@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createSessionToken, verifySessionToken } from "./session.js";
+import { createSessionToken, revokeSessionsFor, verifySessionToken } from "./session.js";
 
 beforeEach(() => {
   process.env.SESSION_SECRET = "test-secret";
@@ -44,5 +44,34 @@ describe("session tokens", () => {
     expect(verifySessionToken("")).toBeNull();
     expect(verifySessionToken("not-a-token")).toBeNull();
     expect(verifySessionToken("a.b.c")).toBeNull();
+  });
+});
+
+describe("revokeSessionsFor", () => {
+  it("invalidates a token that was already issued", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+    const token = createSessionToken("facility-revoke-1");
+    expect(verifySessionToken(token)).toBe("facility-revoke-1");
+
+    vi.setSystemTime(new Date("2026-03-01T00:00:01Z"));
+    revokeSessionsFor("facility-revoke-1");
+    expect(verifySessionToken(token)).toBeNull();
+  });
+
+  it("does not invalidate a token issued after the revocation", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+    revokeSessionsFor("facility-revoke-2");
+
+    vi.setSystemTime(new Date("2026-03-01T00:00:01Z"));
+    const token = createSessionToken("facility-revoke-2");
+    expect(verifySessionToken(token)).toBe("facility-revoke-2");
+  });
+
+  it("does not affect a different facility's token", () => {
+    const token = createSessionToken("facility-revoke-3");
+    revokeSessionsFor("some-other-facility");
+    expect(verifySessionToken(token)).toBe("facility-revoke-3");
   });
 });

@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { setupAuth } from "./auth/plugin.js";
@@ -18,9 +19,25 @@ if (!process.env.SESSION_SECRET) {
   process.exit(1);
 }
 
-const app = Fastify({ logger: true, trustProxy: true });
+// Only trust X-Forwarded-* headers from an explicitly configured reverse
+// proxy. Trusting them unconditionally (trustProxy: true) would let any
+// client set its own X-Forwarded-For and be believed — and since
+// @fastify/rate-limit below keys its per-IP login/signup limits off
+// request.ip, that would make those limits trivially bypassable by
+// spoofing a new "client IP" on every request. Defaults to not trusting
+// any hop (request.ip falls back to the real socket address — safe, if
+// coarse, if a proxy sits in front). Set TRUST_PROXY to that proxy's
+// address/CIDR once deployed behind one; see Fastify's trustProxy docs for
+// accepted formats.
+const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY || false });
 
 app.get("/healthz", async () => ({ ok: true }));
+
+// global: false — this only makes the plugin's machinery available; it does
+// not throttle any route by itself. Individual routes opt in with a
+// `config: { rateLimit: {...} }` option (see routes/auth.ts for login and
+// signup, the only endpoints that need it).
+await app.register(rateLimit, { global: false });
 
 // Not app.register(setupAuth) — see the comment on setupAuth for why that
 // would silently break auth for every other route.

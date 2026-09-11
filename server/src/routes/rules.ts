@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../auth/plugin.js";
 import { db } from "../db/client.js";
 import { rules } from "../db/schema.js";
+import { pickDefined } from "../lib/pick.js";
 
 interface RulesBody {
   minNight: number;
@@ -13,6 +14,15 @@ interface RulesBody {
   offForBlock: Record<number, number>;
 }
 
+const RULES_UPDATE_KEYS = [
+  "minNight",
+  "allowTwoMaleNight",
+  "minAfternoon",
+  "weeklyOff",
+  "nightBlockLengths",
+  "offForBlock",
+] as const;
+
 export async function rulesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
@@ -22,8 +32,11 @@ export async function rulesRoutes(app: FastifyInstance) {
     return row;
   });
 
-  app.patch<{ Body: Partial<RulesBody> }>("/api/rules", async (request) => {
-    await db.update(rules).set(request.body).where(eq(rules.facilityId, request.facilityId!));
+  app.patch<{ Body: Partial<RulesBody> }>("/api/rules", async (request, reply) => {
+    const updates = pickDefined(request.body, RULES_UPDATE_KEYS);
+    if (Object.keys(updates).length === 0) return reply.code(400).send({ error: "No fields to update." });
+
+    await db.update(rules).set(updates).where(eq(rules.facilityId, request.facilityId!));
     return { ok: true };
   });
 }

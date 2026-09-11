@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../auth/plugin.js";
 import { db } from "../db/client.js";
 import { staff } from "../db/schema.js";
+import { pickDefined } from "../lib/pick.js";
 
 interface StaffBody {
   name: string;
@@ -13,6 +14,8 @@ interface StaffBody {
   active: boolean;
 }
 
+const STAFF_UPDATE_KEYS = ["name", "sex", "fixedMorning", "nightEligible", "active"] as const;
+
 export async function staffRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
@@ -21,7 +24,8 @@ export async function staffRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: StaffBody }>("/api/staff", async (request) => {
-    const row = { id: randomUUID(), facilityId: request.facilityId!, ...request.body };
+    const { name, sex, fixedMorning, nightEligible, active } = request.body;
+    const row = { id: randomUUID(), facilityId: request.facilityId!, name, sex, fixedMorning, nightEligible, active };
     await db.insert(staff).values(row);
     return row;
   });
@@ -45,8 +49,11 @@ export async function staffRoutes(app: FastifyInstance) {
   });
 
   app.patch<{ Params: { id: string }; Body: Partial<StaffBody> }>("/api/staff/:id", async (request, reply) => {
+    const updates = pickDefined(request.body, STAFF_UPDATE_KEYS);
+    if (Object.keys(updates).length === 0) return reply.code(400).send({ error: "No fields to update." });
+
     const result = await db.update(staff)
-      .set(request.body)
+      .set(updates)
       .where(and(eq(staff.id, request.params.id), eq(staff.facilityId, request.facilityId!)))
       .returning({ id: staff.id });
     if (result.length === 0) return reply.code(404).send({ error: "Not found" });

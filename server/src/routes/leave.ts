@@ -27,7 +27,8 @@ export async function leaveRoutes(app: FastifyInstance) {
     });
     if (!owned) return reply.code(400).send({ error: "Unknown staff member." });
 
-    const row = { id: randomUUID(), facilityId: request.facilityId!, ...request.body };
+    const { staffId, type, start, end } = request.body;
+    const row = { id: randomUUID(), facilityId: request.facilityId!, staffId, type, start, end };
     await db.insert(leave).values(row);
     return row;
   });

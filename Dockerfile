@@ -29,12 +29,15 @@ RUN npm ci --omit=dev
 FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY server/package.json ./server/package.json
-COPY --from=server-deps /app/server/node_modules ./server/node_modules
-COPY --from=server-build /app/server/dist ./server/dist
-COPY server/drizzle ./server/drizzle
-COPY --from=frontend-build /app/dist ./dist
+COPY --chown=node:node server/package.json ./server/package.json
+COPY --chown=node:node --from=server-deps /app/server/node_modules ./server/node_modules
+COPY --chown=node:node --from=server-build /app/server/dist ./server/dist
+COPY --chown=node:node server/drizzle ./server/drizzle
+COPY --chown=node:node --from=frontend-build /app/dist ./dist
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1
+# node:26-alpine ships a built-in unprivileged "node" user — no reason to
+# run the server as root inside the container.
+USER node
 CMD ["sh", "-c", "node server/dist/db/migrate.js && node server/dist/index.js"]

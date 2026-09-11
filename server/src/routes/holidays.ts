@@ -13,7 +13,8 @@ export async function holidayRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: { date: string; name: string } }>("/api/holidays", async (request) => {
-    const row = { id: randomUUID(), facilityId: request.facilityId!, ...request.body };
+    const { date, name } = request.body;
+    const row = { id: randomUUID(), facilityId: request.facilityId!, date, name };
     await db.insert(holidays).values(row);
     return row;
   });

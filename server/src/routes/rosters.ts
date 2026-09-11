@@ -28,7 +28,8 @@ export async function rosterRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid year/month." });
       }
 
-      const row = { facilityId: request.facilityId!, year, month, ...request.body };
+      const { grid, seed, generatedAt, edited, notes } = request.body;
+      const row = { facilityId: request.facilityId!, year, month, grid, seed, generatedAt, edited, notes };
       await db.insert(rosters).values(row).onConflictDoUpdate({
         target: [rosters.facilityId, rosters.year, rosters.month],
         set: {
