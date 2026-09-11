@@ -52,6 +52,18 @@ export async function addStaff(unitId: string, data: Omit<Staff, "id" | "unitId"
   return staff;
 }
 
+/** Creates one staff row per name in a single write — for pasting in a
+ *  whole ward's staff list at once instead of adding rows one at a time.
+ *  Everyone lands with the same rotating-staff defaults; sex, fixed-morning
+ *  and night-eligible are then set per row same as any other staff member. */
+export async function addStaffBulk(unitId: string, names: string[]): Promise<Staff[]> {
+  const staff: Staff[] = names.map((name) => ({
+    id: uid(), unitId, name, sex: "F", fixedMorning: false, nightEligible: true, active: true,
+  }));
+  await db.staff.bulkAdd(staff);
+  return staff;
+}
+
 export async function updateStaff(id: string, patch: Partial<Omit<Staff, "id" | "unitId">>): Promise<void> {
   await db.staff.update(id, patch);
 }
