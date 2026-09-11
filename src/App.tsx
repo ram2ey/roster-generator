@@ -10,7 +10,8 @@ import { StaffPanel } from "./components/StaffPanel";
 import { MONTHS, SHIFT } from "./constants";
 import { useAuth } from "./hooks/useAuth";
 import { useRosterState } from "./hooks/useRosterState";
-import { nextMonth, prevMonth } from "./lib/dateUtils";
+import { monthRange, stepRange } from "./lib/dateUtils";
+import type { Roster } from "./types";
 
 type Tab = "staff" | "rules" | "leave" | "balance";
 
@@ -21,17 +22,107 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "balance", label: "Workload balance" },
 ];
 
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1].slice(0, 3)} ${y}`;
+}
+
+// The common case (a plain calendar month) gets the familiar "March 2026"
+// label; anything else (a custom range, most often one that crosses a
+// month boundary) shows its actual dates — there's no other way to name it.
+function periodLabel(startDate: string, endDate: string): string {
+  const range = monthRange(startDate.slice(0, 7));
+  if (range.startDate === startDate && range.endDate === endDate) {
+    const [y, m] = startDate.split("-").map(Number);
+    return `${MONTHS[m - 1]} ${y}`;
+  }
+  return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+}
+
+function todayMonthRange() {
+  const today = new Date();
+  return monthRange(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`);
+}
+
+function PeriodPicker({
+  startDate, endDate, rosters, onSelect,
+}: {
+  startDate: string;
+  endDate: string;
+  rosters: Roster[];
+  onSelect: (startDate: string, endDate: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customStart, setCustomStart] = useState(startDate);
+  const [customEnd, setCustomEnd] = useState(endDate);
+
+  const saved = [...rosters].sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
+
+  if (!open) {
+    return (
+      <div className="row tight">
+        {saved.length > 0 && (
+          <select
+            className="field"
+            value={`${startDate}_${endDate}`}
+            onChange={(e) => {
+              const [s, en] = e.target.value.split("_");
+              onSelect(s, en);
+            }}
+          >
+            {!saved.some((r) => r.startDate === startDate && r.endDate === endDate) && (
+              <option value={`${startDate}_${endDate}`}>{periodLabel(startDate, endDate)} (unsaved)</option>
+            )}
+            {saved.map((r) => (
+              <option key={r.id} value={`${r.startDate}_${r.endDate}`}>{periodLabel(r.startDate, r.endDate)}</option>
+            ))}
+          </select>
+        )}
+        <button type="button" className="btn ghost small" onClick={() => { setCustomStart(startDate); setCustomEnd(endDate); setOpen(true); }}>
+          New period
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="row tight">
+      <input
+        type="month"
+        className="field"
+        aria-label="Quick-pick a calendar month"
+        onChange={(e) => {
+          if (!e.target.value) return;
+          const r = monthRange(e.target.value);
+          setCustomStart(r.startDate);
+          setCustomEnd(r.endDate);
+        }}
+      />
+      <input type="date" className="field" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+      <span className="panel-note" style={{ margin: 0 }}>to</span>
+      <input type="date" className="field" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+      <button
+        type="button"
+        className="btn small"
+        disabled={!customStart || !customEnd || customStart > customEnd}
+        onClick={() => { onSelect(customStart, customEnd); setOpen(false); }}
+      >
+        Use this range
+      </button>
+      <button type="button" className="btn ghost small" onClick={() => setOpen(false)}>Cancel</button>
+    </div>
+  );
+}
+
 export default function App() {
   const auth = useAuth();
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [{ startDate, endDate }, setPeriod] = useState(todayMonthRange);
   const [tab, setTab] = useState<Tab>("staff");
 
   const authed = auth.status === "authed";
   const {
-    loading, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, actions,
-  } = useRosterState(year, month, authed);
+    loading, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, rosters, actions,
+  } = useRosterState(startDate, endDate, authed);
 
   if (auth.status === "loading") {
     return (
@@ -53,11 +144,7 @@ export default function App() {
     );
   }
 
-  const step = (dir: -1 | 1) => {
-    const p = dir === -1 ? prevMonth(year, month) : nextMonth(year, month);
-    setYear(p.y);
-    setMonth(p.m);
-  };
+  const step = (dir: -1 | 1) => setPeriod(stepRange(startDate, endDate, dir));
 
   return (
     <div className="app">
@@ -65,15 +152,18 @@ export default function App() {
         <div>
           <p className="masthead-brand">Roster Generator</p>
           <div className="masthead-id">
-            <button type="button" className="masthead-step" onClick={() => step(-1)} aria-label="Previous month">‹</button>
-            <h1 className="masthead-title">{MONTHS[month - 1]} {year}</h1>
-            <button type="button" className="masthead-step" onClick={() => step(1)} aria-label="Next month">›</button>
+            <button type="button" className="masthead-step" onClick={() => step(-1)} aria-label="Previous period">‹</button>
+            <h1 className="masthead-title">{periodLabel(startDate, endDate)}</h1>
+            <button type="button" className="masthead-step" onClick={() => step(1)} aria-label="Next period">›</button>
           </div>
           <p className="masthead-meta">
-            {staff.length} staff · {days.length} days · {monthsOnRecord} month{monthsOnRecord === 1 ? "" : "s"} on record
+            {staff.length} staff · {days.length} days · {monthsOnRecord} period{monthsOnRecord === 1 ? "" : "s"} on record
             {roster ? ` · ${issues.length} issue${issues.length === 1 ? "" : "s"}` : " · not generated"}
             {roster?.edited && <span className="edited"> · edited by hand</span>}
           </p>
+          <div style={{ marginTop: 8 }}>
+            <PeriodPicker startDate={startDate} endDate={endDate} rosters={rosters} onSelect={(s, e) => setPeriod({ startDate: s, endDate: e })} />
+          </div>
         </div>
         <div className="masthead-actions">
           <button type="button" className="btn primary" onClick={actions.generate}>
@@ -92,7 +182,7 @@ export default function App() {
 
       {!roster ? (
         <div className="empty" style={{ marginTop: 16 }}>
-          No roster for {MONTHS[month - 1]} yet. Set your staff and rules below, then generate.
+          No roster for {periodLabel(startDate, endDate)} yet. Set your staff and rules below, then generate.
         </div>
       ) : (
         <div style={{ marginTop: 16 }}>

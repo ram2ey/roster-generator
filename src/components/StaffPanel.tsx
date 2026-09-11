@@ -33,6 +33,7 @@ export function StaffPanel({ staff, onAddBulk, onUpdate, onRemove }: StaffPanelP
         <thead>
           <tr>
             <th>Name</th>
+            <th>Rank</th>
             <th>Sex</th>
             <th>Fixed morning</th>
             <th>Night eligible</th>
@@ -47,6 +48,14 @@ export function StaffPanel({ staff, onAddBulk, onUpdate, onRemove }: StaffPanelP
                   className="field"
                   value={s.name}
                   onChange={(e) => onUpdate(s.id, { name: e.target.value })}
+                />
+              </td>
+              <td>
+                <input
+                  className="field"
+                  placeholder="e.g. SNO"
+                  value={s.rank}
+                  onChange={(e) => onUpdate(s.id, { rank: e.target.value })}
                 />
               </td>
               <td>

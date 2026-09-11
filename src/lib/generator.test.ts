@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_RULES } from "../constants";
-import type { Rules, Staff } from "../types";
-import { buildDays } from "./dateUtils";
+import type { Roster, Rules, Staff } from "../types";
+import { buildDaysInRange } from "./dateUtils";
 import { generateRoster } from "./generator";
 import { validate } from "./validation";
 
@@ -17,21 +17,20 @@ const RULES: Rules = structuredClone(DEFAULT_RULES);
 function fullPool(): Staff[] {
   const fixed = ["Francis", "Emmanuel", "Faustina", "Gertrude"].map((name, i) => ({
     id: `fixed-${i}`, name, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
-    fixedMorning: true, nightEligible: false, active: true,
+    fixedMorning: true, nightEligible: false, active: true, rank: "",
   }));
   const rotating = Array.from({ length: 12 }, (_, i) => ({
     id: `rot-${i}`, name: `Rotating ${i + 1}`, sex: (i % 2 === 0 ? "M" : "F") as "M" | "F",
-    fixedMorning: false, nightEligible: true, active: true,
+    fixedMorning: false, nightEligible: true, active: true, rank: "",
   }));
   return [...fixed, ...rotating];
 }
 
 describe("generateRoster — full staff pool", () => {
-  const year = 2024, month = 3; // March 2024, 31 days
-  const days = buildDays(year, month);
+  const days = buildDaysInRange("2024-03-01", "2024-03-31"); // March 2024, 31 days
   const staff = fullPool();
   const roster = generateRoster({
-    year, month, staff, rules: RULES, leave: [], holidays: [],
+    days, staff, rules: RULES, leave: [], holidays: [],
     prevRoster: undefined, history: {}, seed: "fixed-test-seed",
   });
 
@@ -63,20 +62,38 @@ describe("generateRoster — full staff pool", () => {
   it("reports no generator notes when the pool is adequate", () => {
     expect(roster.notes).toEqual([]);
   });
+
+  it("records the period's own start/end dates", () => {
+    expect(roster.startDate).toBe("2024-03-01");
+    expect(roster.endDate).toBe("2024-03-31");
+  });
+});
+
+describe("generateRoster — a period that crosses a calendar-month boundary", () => {
+  it("generates a complete grid over a 4-week range spanning two months", () => {
+    const days = buildDaysInRange("2026-07-06", "2026-08-02"); // 28 days, like a real ward rotation
+    const staff = fullPool();
+    const roster = generateRoster({
+      days, staff, rules: RULES, leave: [], holidays: [],
+      prevRoster: undefined, history: {}, seed: "cross-month-seed",
+    });
+    staff.forEach((s) => days.forEach((d) => expect(roster.grid[s.id][d.iso]).toBeDefined()));
+    expect(roster.startDate).toBe("2026-07-06");
+    expect(roster.endDate).toBe("2026-08-02");
+  });
 });
 
 describe("generateRoster — thin staff pool", () => {
   it("reports issues instead of silently under-filling the roster", () => {
-    const year = 2024, month = 3;
-    const days = buildDays(year, month);
+    const days = buildDaysInRange("2024-03-01", "2024-03-31");
     // Only one night-eligible staff member — well below minNight (3) and
     // below the 2-male exception too.
     const staff: Staff[] = [
-      { id: "n1", name: "Solo Night", sex: "M", fixedMorning: false, nightEligible: true, active: true },
-      { id: "m1", name: "Fixed Morning", sex: "F", fixedMorning: true, nightEligible: false, active: true },
+      { id: "n1", name: "Solo Night", sex: "M", fixedMorning: false, nightEligible: true, active: true, rank: "" },
+      { id: "m1", name: "Fixed Morning", sex: "F", fixedMorning: true, nightEligible: false, active: true, rank: "" },
     ];
     const roster = generateRoster({
-      year, month, staff, rules: RULES, leave: [], holidays: [],
+      days, staff, rules: RULES, leave: [], holidays: [],
       prevRoster: undefined, history: {}, seed: "thin-pool-seed",
     });
 
@@ -89,11 +106,11 @@ describe("generateRoster — thin staff pool", () => {
 
 describe("generateRoster — leave and holidays", () => {
   it("never overwrites approved leave", () => {
-    const year = 2024, month = 3;
+    const days = buildDaysInRange("2024-03-01", "2024-03-31");
     const staff = fullPool();
     const leave = [{ id: "l1", staffId: "rot-0", type: "AL" as const, start: "2024-03-05", end: "2024-03-09" }];
     const roster = generateRoster({
-      year, month, staff, rules: RULES, leave, holidays: [],
+      days, staff, rules: RULES, leave, holidays: [],
       prevRoster: undefined, history: {}, seed: "leave-seed",
     });
     for (let d = 5; d <= 9; d++) {
@@ -102,15 +119,57 @@ describe("generateRoster — leave and holidays", () => {
   });
 
   it("marks a declared holiday as H instead of the plain M a fixed-morning staff member would otherwise get", () => {
-    const year = 2024, month = 3;
+    const days = buildDaysInRange("2024-03-01", "2024-03-31");
     const staff = fullPool();
     // 2024-03-25 is a Monday, so a fixed-morning staff member would
     // otherwise be working "M" — the holiday should override that to "H".
     const holidays = [{ id: "h1", date: "2024-03-25", name: "Test holiday" }];
     const roster = generateRoster({
-      year, month, staff, rules: RULES, leave: [], holidays,
+      days, staff, rules: RULES, leave: [], holidays,
       prevRoster: undefined, history: {}, seed: "holiday-seed",
     });
     expect(roster.grid["fixed-0"]["2024-03-25"]).toBe("H");
+  });
+});
+
+describe("generateRoster — carry-over across periods", () => {
+  const staff = fullPool();
+
+  function prevRosterEndingInNights(endDate: string, nightsAtEnd: number): Roster {
+    const start = new Date(endDate + "T00:00:00Z");
+    start.setUTCDate(start.getUTCDate() - 6);
+    const days = buildDaysInRange(start.toISOString().slice(0, 10), endDate);
+    const grid: Roster["grid"] = { "rot-0": {} };
+    days.forEach((d, i) => {
+      grid["rot-0"][d.iso] = i >= days.length - nightsAtEnd ? "N" : "X";
+    });
+    return { id: "prev", startDate: days[0].iso, endDate, grid, seed: "s", generatedAt: "", edited: false, notes: [] };
+  }
+
+  it("continues a night block into a period that starts exactly the day after the previous one ends", () => {
+    const prevRoster = prevRosterEndingInNights("2024-03-01", 2); // 2 nights so far, block of 3 needs 1 more
+    const days = buildDaysInRange("2024-03-02", "2024-03-31");
+    const roster = generateRoster({
+      days, staff, rules: RULES, leave: [], holidays: [], prevRoster, history: {}, seed: "carry-seed",
+    });
+    expect(roster.grid["rot-0"]["2024-03-02"]).toBe("N");
+  });
+
+  it("ignores a previous roster that doesn't end exactly the day before this period starts (a gap)", () => {
+    const prevRoster = prevRosterEndingInNights("2024-02-20", 2); // ends 10 days before the new period starts
+    const days = buildDaysInRange("2024-03-02", "2024-03-31");
+    const roster = generateRoster({
+      days, staff, rules: RULES, leave: [], holidays: [], prevRoster, history: {}, seed: "carry-gap-seed",
+    });
+    // The contiguous case above forces exactly this pattern — one night
+    // then two days off, starting on day 1 — as a direct artifact of the
+    // carry-over math (remaining=1 night, then offForBlock[3]=2 days off).
+    // That pattern only fires for a genuinely adjacent previous roster, so
+    // it must not appear here.
+    const forcedCarryPattern =
+      roster.grid["rot-0"]["2024-03-02"] === "N" &&
+      ["X", "H"].includes(roster.grid["rot-0"]["2024-03-03"]) &&
+      ["X", "H"].includes(roster.grid["rot-0"]["2024-03-04"]);
+    expect(forcedCarryPattern).toBe(false);
   });
 });

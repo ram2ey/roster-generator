@@ -13,6 +13,38 @@ export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRem
   return (
     <>
       <div className="panel">
+        <h3>Roster header</h3>
+        <p className="panel-note">Printed on the exported roster and used to split staff into the export's two tally groups.</p>
+        <div className="stack" style={{ marginTop: 10 }}>
+          <div className="row tight">
+            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Hospital name</label>
+            <input
+              className="field" style={{ width: 220 }}
+              value={rules.hospitalName}
+              onChange={(e) => onUpdateRules({ hospitalName: e.target.value })}
+            />
+          </div>
+          <div className="row tight">
+            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Ward name</label>
+            <input
+              className="field" style={{ width: 220 }}
+              value={rules.wardName}
+              onChange={(e) => onUpdateRules({ wardName: e.target.value })}
+            />
+          </div>
+          <div className="row tight">
+            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Support-band ranks</label>
+            <SupportRanksField ranks={rules.supportRanks} onUpdate={(supportRanks) => onUpdateRules({ supportRanks })} />
+          </div>
+        </div>
+        <p className="panel-note">
+          Staff whose rank matches one of these (comma-separated, e.g. "SUP/HA, WO") get their own
+          section and tally block on the exported roster, after everyone else. Leave blank for one
+          group.
+        </p>
+      </div>
+
+      <div className="panel">
         <h3>Staffing rules</h3>
         <div className="stack" style={{ marginTop: 10 }}>
           <div className="row tight">
@@ -71,6 +103,21 @@ export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRem
         <HolidayAdd onAdd={onAddHoliday} />
       </div>
     </>
+  );
+}
+
+function SupportRanksField({ ranks, onUpdate }: { ranks: string[]; onUpdate: (ranks: string[]) => void }) {
+  const [raw, setRaw] = useState(ranks.join(", "));
+  return (
+    <input
+      className="field" style={{ width: 220 }}
+      placeholder="e.g. SUP/HA, WO"
+      value={raw}
+      onChange={(e) => {
+        setRaw(e.target.value);
+        onUpdate(e.target.value.split(",").map((r) => r.trim()).filter(Boolean));
+      }}
+    />
   );
 }
 

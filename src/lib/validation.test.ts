@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDays } from "./dateUtils";
+import { buildDaysInRange } from "./dateUtils";
 import { validate } from "./validation";
 import type { Rules, ShiftCode, Staff } from "../types";
 
@@ -10,17 +10,20 @@ const RULES: Rules = {
   weeklyOff: 2,
   nightBlockLengths: [3, 4],
   offForBlock: { 3: 2, 4: 3 },
+  hospitalName: "",
+  wardName: "",
+  supportRanks: [],
 };
 
 function makeStaff(n: number, sex: "M" | "F" = "F"): Staff[] {
   return Array.from({ length: n }, (_, i) => ({
-    id: `s${i + 1}`, name: `Staff ${i + 1}`, sex, fixedMorning: false, nightEligible: true, active: true,
+    id: `s${i + 1}`, name: `Staff ${i + 1}`, sex, fixedMorning: false, nightEligible: true, active: true, rank: "",
   }));
 }
 
 // Jan 2024: Jan 1 is a Monday, so days 1-28 form four clean weeks and
 // days 29-31 are a trailing partial week.
-const days = buildDays(2024, 1);
+const days = buildDaysInRange("2024-01-01", "2024-01-31");
 
 function fillDay(grid: Record<string, Record<string, ShiftCode>>, iso: string, staffIds: string[], code: ShiftCode) {
   staffIds.forEach((id) => {

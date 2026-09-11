@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../auth/plugin.js";
 import { db } from "../db/client.js";
@@ -12,6 +13,23 @@ interface RosterBody {
   notes: string[];
 }
 
+interface RosterCreateBody extends RosterBody {
+  startDate: string;
+  endDate: string;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidRange(startDate: unknown, endDate: unknown): startDate is string {
+  return (
+    typeof startDate === "string" &&
+    typeof endDate === "string" &&
+    ISO_DATE.test(startDate) &&
+    ISO_DATE.test(endDate) &&
+    startDate <= endDate
+  );
+}
+
 export async function rosterRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
@@ -19,28 +37,24 @@ export async function rosterRoutes(app: FastifyInstance) {
     return db.select().from(rosters).where(eq(rosters.facilityId, request.facilityId!));
   });
 
-  app.put<{ Params: { year: string; month: string }; Body: RosterBody }>(
-    "/api/rosters/:year/:month",
-    async (request, reply) => {
-      const year = Number(request.params.year);
-      const month = Number(request.params.month);
-      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        return reply.code(400).send({ error: "Invalid year/month." });
-      }
+  app.post<{ Body: RosterCreateBody }>("/api/rosters", async (request, reply) => {
+    const { startDate, endDate, grid, seed, generatedAt, edited, notes } = request.body;
+    if (!isValidRange(startDate, endDate)) {
+      return reply.code(400).send({ error: "Invalid date range." });
+    }
 
-      const { grid, seed, generatedAt, edited, notes } = request.body;
-      const row = { facilityId: request.facilityId!, year, month, grid, seed, generatedAt, edited, notes };
-      await db.insert(rosters).values(row).onConflictDoUpdate({
-        target: [rosters.facilityId, rosters.year, rosters.month],
-        set: {
-          grid: row.grid,
-          seed: row.seed,
-          generatedAt: row.generatedAt,
-          edited: row.edited,
-          notes: row.notes,
-        },
-      });
-      return row;
-    },
-  );
+    const row = { id: randomUUID(), facilityId: request.facilityId!, startDate, endDate, grid, seed, generatedAt, edited, notes };
+    await db.insert(rosters).values(row);
+    return row;
+  });
+
+  app.put<{ Params: { id: string }; Body: RosterBody }>("/api/rosters/:id", async (request, reply) => {
+    const { grid, seed, generatedAt, edited, notes } = request.body;
+    const result = await db.update(rosters)
+      .set({ grid, seed, generatedAt, edited, notes })
+      .where(and(eq(rosters.id, request.params.id), eq(rosters.facilityId, request.facilityId!)))
+      .returning();
+    if (result.length === 0) return reply.code(404).send({ error: "Not found" });
+    return result[0];
+  });
 }

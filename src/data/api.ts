@@ -90,5 +90,8 @@ export const removeLeave = (id: string) => request<{ ok: true }>(`/api/leave/${i
 
 export const listRosters = () => request<Roster[]>("/api/rosters");
 
-export const saveRoster = (year: number, month: number, data: Omit<Roster, "year" | "month">) =>
-  request<Roster>(`/api/rosters/${year}/${month}`, { method: "PUT", body: JSON.stringify(data) });
+export const createRoster = (data: Omit<Roster, "id">) =>
+  request<Roster>("/api/rosters", { method: "POST", body: JSON.stringify(data) });
+
+export const updateRoster = (id: string, data: Omit<Roster, "id" | "startDate" | "endDate">) =>
+  request<Roster>(`/api/rosters/${id}`, { method: "PUT", body: JSON.stringify(data) });

@@ -12,9 +12,10 @@ interface StaffBody {
   fixedMorning: boolean;
   nightEligible: boolean;
   active: boolean;
+  rank: string;
 }
 
-const STAFF_UPDATE_KEYS = ["name", "sex", "fixedMorning", "nightEligible", "active"] as const;
+const STAFF_UPDATE_KEYS = ["name", "sex", "fixedMorning", "nightEligible", "active", "rank"] as const;
 
 export async function staffRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
@@ -24,8 +25,11 @@ export async function staffRoutes(app: FastifyInstance) {
   });
 
   app.post<{ Body: StaffBody }>("/api/staff", async (request) => {
-    const { name, sex, fixedMorning, nightEligible, active } = request.body;
-    const row = { id: randomUUID(), facilityId: request.facilityId!, name, sex, fixedMorning, nightEligible, active };
+    const { name, sex, fixedMorning, nightEligible, active, rank } = request.body;
+    const row = {
+      id: randomUUID(), facilityId: request.facilityId!, name, sex, fixedMorning, nightEligible, active,
+      rank: rank ?? "",
+    };
     await db.insert(staff).values(row);
     return row;
   });

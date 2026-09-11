@@ -26,6 +26,10 @@ export interface Staff {
   fixedMorning: boolean;
   nightEligible: boolean;
   active: boolean;
+  // Free text ("PNO I/C", "SNO", "SUP/HA", ...) — hospital-specific
+  // designation, printed on the roster export and used to group staff into
+  // the export's two tally bands (see Rules.supportRanks).
+  rank: string;
 }
 
 export interface Leave {
@@ -49,6 +53,11 @@ export interface Rules {
   weeklyOff: number;
   nightBlockLengths: number[];
   offForBlock: Record<number, number>;
+  hospitalName: string;
+  wardName: string;
+  // Ranks that belong in the export's second ("support") tally group.
+  // Empty means everyone is in one group.
+  supportRanks: string[];
 }
 
 // One row per assignable day: staffId -> code. Kept as a nested object
@@ -57,8 +66,12 @@ export interface Rules {
 export type RosterGrid = Record<string, Record<string, ShiftCode>>;
 
 export interface Roster {
-  year: number;
-  month: number;
+  id: string;
+  // ISO dates. A roster period is an arbitrary user-chosen range — a ward's
+  // rotation commonly crosses a calendar-month boundary — not necessarily a
+  // calendar month.
+  startDate: string;
+  endDate: string;
   grid: RosterGrid;
   seed: string;
   generatedAt: string;

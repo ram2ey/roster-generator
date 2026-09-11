@@ -32,6 +32,9 @@ export const DEFAULT_RULES: Rules = {
   weeklyOff: 2,
   nightBlockLengths: [3, 4], // 3 nights -> 2 off, 4 nights -> 3 off
   offForBlock: { 3: 2, 4: 3 },
+  hospitalName: "",
+  wardName: "",
+  supportRanks: [],
 };
 
 export const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -12,6 +12,9 @@ interface RulesBody {
   weeklyOff: number;
   nightBlockLengths: number[];
   offForBlock: Record<number, number>;
+  hospitalName: string;
+  wardName: string;
+  supportRanks: string[];
 }
 
 const RULES_UPDATE_KEYS = [
@@ -21,6 +24,9 @@ const RULES_UPDATE_KEYS = [
   "weeklyOff",
   "nightBlockLengths",
   "offForBlock",
+  "hospitalName",
+  "wardName",
+  "supportRanks",
 ] as const;
 
 export async function rulesRoutes(app: FastifyInstance) {

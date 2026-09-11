@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CYCLE, isLeaveCode } from "../constants";
 import * as api from "../data/api";
-import { buildDays, monthKey, prevMonth } from "../lib/dateUtils";
+import { buildDaysInRange } from "../lib/dateUtils";
 import { downloadCSV, toCSV } from "../lib/exporters";
 import { generateRoster } from "../lib/generator";
 import { buildHistory } from "../lib/history";
@@ -9,13 +9,13 @@ import { validate } from "../lib/validation";
 import type { Holiday, Leave, Roster, Rules, Staff } from "../types";
 
 /**
- * Everything needed to drive the signed-in account's roster for one month:
+ * Everything needed to drive the signed-in account's roster for one period:
  * the generate/edit/export actions plus the data they read. There is no
  * live-query layer here (unlike the Dexie version this replaced) — each
  * mutation calls the API then reloads, which is simple to reason about and
  * plenty fast for how often this data actually changes.
  */
-export function useRosterState(year: number, month: number, ready: boolean) {
+export function useRosterState(startDate: string, endDate: string, ready: boolean) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [rules, setRules] = useState<Rules | undefined>(undefined);
   const [leave, setLeave] = useState<Leave[]>([]);
@@ -42,12 +42,12 @@ export function useRosterState(year: number, month: number, ready: boolean) {
     return () => { alive = false; };
   }, [ready, reload]);
 
-  const roster = rosters.find((r) => r.year === year && r.month === month);
-  const days = useMemo(() => buildDays(year, month), [year, month]);
+  const roster = rosters.find((r) => r.startDate === startDate && r.endDate === endDate);
+  const days = useMemo(() => buildDaysInRange(startDate, endDate), [startDate, endDate]);
 
   const history = useMemo(
-    () => buildHistory(rosters, roster ? { year, month } : undefined),
-    [rosters, roster, year, month],
+    () => buildHistory(rosters, roster ? { startDate, endDate } : undefined),
+    [rosters, roster, startDate, endDate],
   );
 
   const issues = useMemo(() => {
@@ -57,17 +57,30 @@ export function useRosterState(year: number, month: number, ready: boolean) {
 
   const generate = useCallback(async () => {
     if (!rules) return;
-    const p = prevMonth(year, month);
-    const prevRoster = rosters.find((r) => r.year === p.y && r.month === p.m);
+
+    // Candidate "previous" roster for carry-over: the most recently-ending
+    // saved roster before this one starts. generateRoster() only actually
+    // uses it if it's genuinely adjacent (ends the day immediately before
+    // this period starts — see the contiguity guard in generator.ts), so
+    // handing over the closest candidate here is safe even if it turns out
+    // to have a gap.
+    const prevRoster = rosters
+      .filter((r) => r.endDate < startDate)
+      .sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
+
     const next = generateRoster({
-      year, month, staff, rules, leave, holidays,
-      prevRoster, history, seed: `${monthKey(year, month)}-${Date.now()}`,
+      days, staff, rules, leave, holidays, prevRoster, history,
+      seed: `${startDate}_${endDate}-${Date.now()}`,
     });
-    await api.saveRoster(year, month, {
-      grid: next.grid, seed: next.seed, generatedAt: next.generatedAt, edited: next.edited, notes: next.notes,
-    });
+    const body = { grid: next.grid, seed: next.seed, generatedAt: next.generatedAt, edited: next.edited, notes: next.notes };
+
+    // Reuse the existing row if this exact period was already saved
+    // (regenerate in place), otherwise create it — don't fork a new row on
+    // every "Generate again".
+    if (roster) await api.updateRoster(roster.id, body);
+    else await api.createRoster({ startDate, endDate, ...body });
     await reload();
-  }, [year, month, staff, rules, leave, holidays, rosters, history, reload]);
+  }, [startDate, endDate, staff, rules, leave, holidays, rosters, history, days, roster, reload]);
 
   const cycleCell = useCallback(async (staffId: string, iso: string) => {
     if (!roster) return;
@@ -75,7 +88,7 @@ export function useRosterState(year: number, month: number, ready: boolean) {
     if (isLeaveCode(current)) return; // leave is edited in the leave panel
     const idx = current ? CYCLE.indexOf(current) : -1;
     const nextCode = CYCLE[(idx + 1) % CYCLE.length];
-    await api.saveRoster(year, month, {
+    await api.updateRoster(roster.id, {
       grid: { ...roster.grid, [staffId]: { ...(roster.grid[staffId] ?? {}), [iso]: nextCode } },
       seed: roster.seed,
       generatedAt: roster.generatedAt,
@@ -83,12 +96,24 @@ export function useRosterState(year: number, month: number, ready: boolean) {
       notes: roster.notes,
     });
     await reload();
-  }, [roster, year, month, reload]);
+  }, [roster, reload]);
 
   const exportCSV = useCallback(() => {
-    if (!roster) return;
-    downloadCSV(`roster-${monthKey(year, month)}.csv`, toCSV({ grid: roster.grid, days, staff, year, month }));
-  }, [roster, days, staff, year, month]);
+    if (!roster || !rules) return;
+    downloadCSV(
+      `roster-${startDate}_${endDate}.csv`,
+      toCSV({
+        hospitalName: rules.hospitalName,
+        wardName: rules.wardName,
+        startDate,
+        endDate,
+        days,
+        staff,
+        grid: roster.grid,
+        supportRanks: rules.supportRanks,
+      }),
+    );
+  }, [roster, rules, days, staff, startDate, endDate]);
 
   const addStaffBulk = useCallback(async (names: string[]) => { await api.addStaffBulk(names); await reload(); }, [reload]);
   const updateStaff = useCallback(

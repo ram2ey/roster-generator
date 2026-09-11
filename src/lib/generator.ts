@@ -1,13 +1,20 @@
 import { isLeaveCode } from "../constants";
-import { buildDays, prevMonth, weekKey } from "./dateUtils";
+import { buildDaysInRange, weekKey } from "./dateUtils";
 import { jitter } from "./history";
 import type {
   CarryOver, DayInfo, History, Holiday, Leave, OffCode, Roster, RosterGrid, Rules, ShiftCode, Staff,
 } from "../types";
 
+/** True when `iso` is the calendar day immediately before `next`. */
+function isDayBefore(iso: string, next: string): boolean {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10) === next;
+}
+
 /**
- * Reads the tail of the previous month so a night block that straddles the
- * month boundary keeps running, and earned days off land in the new month.
+ * Reads the tail of the previous period so a night block that straddles the
+ * boundary keeps running, and earned days off land in the new period.
  */
 export function readCarry(prevRoster: Roster | undefined, prevDays: DayInfo[], rules: Rules): CarryOver {
   const carry: CarryOver = { continuingNights: {}, offOwed: {} };
@@ -38,8 +45,7 @@ export function readCarry(prevRoster: Roster | undefined, prevDays: DayInfo[], r
 }
 
 export interface GenerateRosterInput {
-  year: number;
-  month: number;
+  days: DayInfo[];
   staff: Staff[];
   rules: Rules;
   leave: Leave[];
@@ -50,9 +56,8 @@ export interface GenerateRosterInput {
 }
 
 export function generateRoster({
-  year, month, staff, rules, leave, holidays, prevRoster, history, seed,
-}: GenerateRosterInput): Roster {
-  const days = buildDays(year, month);
+  days, staff, rules, leave, holidays, prevRoster, history, seed,
+}: GenerateRosterInput): Omit<Roster, "id"> {
   const holidaySet = new Set(holidays.map((h) => h.date));
   const grid: RosterGrid = {};
   staff.forEach((s) => (grid[s.id] = {}));
@@ -76,11 +81,17 @@ export function generateRoster({
     });
   });
 
-  /* -- Carry-over from last month ----------------------------------------- */
-  const prevDays = (() => {
-    const p = prevMonth(year, month);
-    return buildDays(p.y, p.m);
-  })();
+  /* -- Carry-over from the immediately preceding period --------------------
+   * Only trusted when prevRoster's range ends exactly the day before this
+   * one starts — a distant or gapped "previous" roster would make this
+   * silently wrong (mid-block night assignments, owed days-off computed
+   * against days that aren't actually adjacent). Callers don't need to
+   * pre-filter which roster counts as "previous"; this is the guard.
+   * ------------------------------------------------------------------- */
+  const prevDays =
+    prevRoster && days.length && isDayBefore(prevRoster.endDate, days[0].iso)
+      ? buildDaysInRange(prevRoster.startDate, prevRoster.endDate)
+      : [];
   const carry = readCarry(prevRoster, prevDays, rules);
 
   Object.entries(carry.offOwed).forEach(([staffId, n]) => {
@@ -218,8 +229,8 @@ export function generateRoster({
   });
 
   return {
-    year,
-    month,
+    startDate: days[0]?.iso ?? "",
+    endDate: days[days.length - 1]?.iso ?? "",
     grid,
     seed,
     generatedAt: new Date().toISOString(),
