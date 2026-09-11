@@ -1,15 +1,18 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import "@fontsource/fraunces/600.css";
-import "@fontsource/fraunces/600-italic.css";
-import "@fontsource/fraunces/700.css";
-import "@fontsource/ibm-plex-sans/400.css";
-import "@fontsource/ibm-plex-sans/500.css";
-import "@fontsource/ibm-plex-sans/600.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
-import "@fontsource/ibm-plex-mono/600.css";
+// Latin-only subsets: staff names and UI copy are English, and shipping
+// every Cyrillic/Greek/Vietnamese subset fontsource bundles by default would
+// needlessly bloat the deployed build.
+import "@fontsource/fraunces/latin-600.css";
+import "@fontsource/fraunces/latin-600-italic.css";
+import "@fontsource/fraunces/latin-700.css";
+import "@fontsource/ibm-plex-sans/latin-400.css";
+import "@fontsource/ibm-plex-sans/latin-500.css";
+import "@fontsource/ibm-plex-sans/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
 
 import "./index.css";
 import App from "./App";
