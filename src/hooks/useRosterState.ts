@@ -15,7 +15,12 @@ import type { Holiday, Leave, Roster, Rules, Staff } from "../types";
  * mutation calls the API then reloads, which is simple to reason about and
  * plenty fast for how often this data actually changes.
  */
-export function useRosterState(startDate: string, endDate: string, ready: boolean) {
+export function useRosterState(
+  startDate: string,
+  endDate: string,
+  ready: boolean,
+  onPaywallTriggered: () => void,
+) {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [rules, setRules] = useState<Rules | undefined>(undefined);
   const [leave, setLeave] = useState<Leave[]>([]);
@@ -74,13 +79,26 @@ export function useRosterState(startDate: string, endDate: string, ready: boolea
     });
     const body = { grid: next.grid, seed: next.seed, generatedAt: next.generatedAt, edited: next.edited, notes: next.notes };
 
-    // Reuse the existing row if this exact period was already saved
-    // (regenerate in place), otherwise create it — don't fork a new row on
-    // every "Generate again".
-    if (roster) await api.updateRoster(roster.id, body);
-    else await api.createRoster({ startDate, endDate, ...body });
-    await reload();
-  }, [startDate, endDate, staff, rules, leave, holidays, rosters, history, days, roster, reload]);
+    try {
+      // Reuse the existing row if this exact period was already saved
+      // (regenerate in place), otherwise create it — don't fork a new row on
+      // every "Generate again".
+      // Keep manual PUT edits separate from an explicit generation. This lets
+      // the server meter every Generate action without charging for a nurse
+      // correcting a cell by hand.
+      if (roster) await api.regenerateRoster(roster.id, body);
+      else await api.createRoster({ startDate, endDate, ...body });
+      await reload();
+    } catch (e) {
+      // 402 from the server means the free generation limit has been reached.
+      // Surface the paywall rather than letting it fall through as a generic error.
+      if (e instanceof api.ApiError && e.status === 402) {
+        onPaywallTriggered();
+      } else {
+        throw e;
+      }
+    }
+  }, [startDate, endDate, staff, rules, leave, holidays, rosters, history, days, roster, reload, onPaywallTriggered]);
 
   const cycleCell = useCallback(async (staffId: string, iso: string) => {
     if (!roster) return;

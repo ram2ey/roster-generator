@@ -4,6 +4,7 @@ import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { setupAuth } from "./auth/plugin.js";
 import { authRoutes } from "./routes/auth.js";
+import { billingRoutes, billingWebhookRoutes } from "./routes/billing.js";
 import { holidayRoutes } from "./routes/holidays.js";
 import { leaveRoutes } from "./routes/leave.js";
 import { rosterRoutes } from "./routes/rosters.js";
@@ -14,9 +15,12 @@ import { staffRoutes } from "./routes/staff.js";
 // starting "successfully" and then throwing deep inside the first
 // login/signup request — that failure mode is hard to tell apart from a
 // real bug and only shows up once someone tries to sign in.
-if (!process.env.SESSION_SECRET) {
-  console.error("SESSION_SECRET is not set — refusing to start.");
-  process.exit(1);
+const REQUIRED_ENV = ["SESSION_SECRET", "PAYSTACK_SECRET_KEY", "APP_URL"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`${key} is not set — refusing to start.`);
+    process.exit(1);
+  }
 }
 
 // Only trust X-Forwarded-* headers from an explicitly configured reverse
@@ -43,6 +47,8 @@ await app.register(rateLimit, { global: false });
 // would silently break auth for every other route.
 await setupAuth(app);
 await app.register(authRoutes);
+await app.register(billingWebhookRoutes);
+await app.register(billingRoutes);
 await app.register(staffRoutes);
 await app.register(leaveRoutes);
 await app.register(holidayRoutes);

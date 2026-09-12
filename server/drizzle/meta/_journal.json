@@ -15,6 +15,20 @@
       "when": 1789158448880,
       "tag": "0001_wild_living_tribunal",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789216432360,
+      "tag": "0002_real_dormammu",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789217365818,
+      "tag": "0003_harsh_loa",
+      "breakpoints": true
     }
   ]
 }

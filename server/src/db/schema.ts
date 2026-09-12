@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 // One row per tenant. There is no visible "ward" concept in the product —
 // a facility is just the account a login belongs to, and every other table
@@ -10,7 +10,32 @@ export const facilities = pgTable("facilities", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+
+  // --- Billing ---
+  // paid: permanently true once a Paystack payment has been verified. False
+  // means the facility is on the free tier (limited to generationCount < 1).
+  paid: boolean("paid").notNull().default(false),
+  // Reference returned by Paystack after a successful charge — kept for
+  // audit purposes and to guard against double-processing the same reference.
+  paystackRef: text("paystack_ref"),
+  // Tracks how many roster-generation actions have been made. Used to
+  // enforce the 1-free-generation limit for unpaid facilities. Incremented
+  // atomically on success; never decremented.
+  generationCount: integer("generation_count").notNull().default(0),
+}, (t) => [uniqueIndex("facilities_paystack_ref_unique").on(t.paystackRef)]);
+
+// Each checkout is recorded before the user is redirected to Paystack. This
+// lets callbacks and signed webhooks recover a completed payment even when
+// the user closes the provider tab before returning to the app.
+export const billingPayments = pgTable("billing_payments", {
+  reference: text("reference").primaryKey(),
+  facilityId: text("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(),
+  currency: text("currency").notNull(),
+  status: text("status", { enum: ["initialized", "paid"] }).notNull().default("initialized"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+}, (t) => [index("billing_payments_facility_idx").on(t.facilityId)]);
 
 export const staff = pgTable("staff", {
   id: text("id").primaryKey(),

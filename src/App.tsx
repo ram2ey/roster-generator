@@ -2,8 +2,10 @@ import { useState } from "react";
 import "./App.css";
 import { AuthScreen } from "./components/AuthScreen";
 import { BalancePanel } from "./components/BalancePanel";
+import { BillingCallback } from "./components/BillingCallback";
 import { IssuesStrip } from "./components/IssuesStrip";
 import { LeavePanel } from "./components/LeavePanel";
+import { PaywallScreen } from "./components/PaywallScreen";
 import { RosterBoard } from "./components/RosterBoard";
 import { RulesPanel } from "./components/RulesPanel";
 import { StaffPanel } from "./components/StaffPanel";
@@ -122,7 +124,29 @@ export default function App() {
   const authed = auth.status === "authed";
   const {
     loading, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, rosters, actions,
-  } = useRosterState(startDate, endDate, authed);
+  } = useRosterState(startDate, endDate, authed, auth.status === "authed" ? auth.triggerPaywall : () => {});
+
+  // --- Billing callback: detect return from Paystack redirect ---
+  // Paystack appends ?reference=... to the callback_url. We check for it on
+  // every render (it only exists right after the redirect back) and show the
+  // verification screen instead of the normal app until it resolves.
+  const callbackRef = new URLSearchParams(window.location.search).get("reference");
+  if (callbackRef && (auth.status === "authed" || auth.status === "paywall")) {
+    return (
+      <BillingCallback
+        reference={callbackRef}
+        onSuccess={() => {
+          // Strip the query param from the URL so a refresh doesn't re-verify.
+          window.history.replaceState({}, "", window.location.pathname);
+          auth.confirmPaid();
+        }}
+        onFailure={() => {
+          window.history.replaceState({}, "", window.location.pathname);
+        }}
+      />
+    );
+  }
+  // ------------------------------------------------------------
 
   if (auth.status === "loading") {
     return (
@@ -134,6 +158,10 @@ export default function App() {
 
   if (auth.status === "anon") {
     return <AuthScreen error={auth.error} onLogin={auth.login} onSignup={auth.signup} />;
+  }
+
+  if (auth.status === "paywall") {
+    return <PaywallScreen email={auth.email} onLogout={auth.logout} onPaid={auth.confirmPaid} />;
   }
 
   if (loading || !rules) {

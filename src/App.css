@@ -40,6 +40,105 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Paywall screen
+ * ------------------------------------------------------------------------ */
+
+.paywallcard {
+  width: 100%;
+  max-width: 420px;
+  border-top: 2px solid var(--ink);
+  padding-top: 20px;
+}
+
+.paywall-badge {
+  display: inline-block;
+  font: 600 10.5px/1 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--good);
+  background: var(--good-soft);
+  border: 1px solid var(--good);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  margin-bottom: 20px;
+}
+
+.paywall-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.paywall-currency {
+  font: 600 18px/1 var(--font-sans);
+  color: var(--muted);
+}
+
+.paywall-amount {
+  font: 700 56px/1 var(--font-display);
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.paywall-features {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.paywall-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.paywall-check {
+  font-weight: 700;
+  color: var(--good);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Spinner for billing callback verification */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.billing-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--line-strong);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+.billing-success-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--good);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+
+
+/* ---------------------------------------------------------------------------
  * Masthead
  * ------------------------------------------------------------------------ */
 
