@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import * as api from "../data/api";
+import { Brand } from "./Icon";
 
 interface BillingCallbackProps {
   reference: string;
   onSuccess: () => void;
-  onFailure: (message: string) => void;
 }
 
 /** Shown at /billing/callback?reference=... after returning from Paystack.
  *  Verifies the payment server-side and calls the appropriate callback. */
-export function BillingCallback({ reference, onSuccess, onFailure }: BillingCallbackProps) {
+export function BillingCallback({ reference, onSuccess }: BillingCallbackProps) {
   const [status, setStatus] = useState<"verifying" | "success" | "failed">("verifying");
   const [message, setMessage] = useState("");
 
@@ -27,7 +27,6 @@ export function BillingCallback({ reference, onSuccess, onFailure }: BillingCall
         const msg = e instanceof api.ApiError ? e.message : "Verification failed. Please contact support.";
         setStatus("failed");
         setMessage(msg);
-        onFailure(msg);
       });
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,6 +35,7 @@ export function BillingCallback({ reference, onSuccess, onFailure }: BillingCall
   return (
     <div className="authshell">
       <div className="authcard" style={{ textAlign: "center", maxWidth: 400 }}>
+        <div className="callback-brand"><Brand /></div>
         {status === "verifying" && (
           <>
             <div className="billing-spinner" aria-label="Verifying payment" />

@@ -14,28 +14,29 @@ export function LeavePanel({ staff, leave, onAdd, onRemove }: LeavePanelProps) {
     staffId: "", type: "AL", start: "", end: "",
   });
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const byId = Object.fromEntries(staff.map((s) => [s.id, s]));
 
   return (
     <div className="panel wide">
-      <h3>Leave</h3>
+      <div className="panel-header"><h3>Planned time away</h3><span className="badge neutral">{leave.length} leave records</span></div>
       <p className="panel-note">
         Leave is fixed before anything else is assigned, and never counts against the weekly days off.
       </p>
-      <div className="row">
-        <select className="field" style={{ width: 210 }} value={form.staffId} onChange={(e) => setForm({ ...form, staffId: e.target.value })}>
+      <div className="leave-form">
+        <label className="field-label" htmlFor="leave-person">Team member<select id="leave-person" aria-label="Team member" className="field" disabled={busy} value={form.staffId} onChange={(e) => setForm({ ...form, staffId: e.target.value })}>
           <option value="">Choose staff</option>
           {staff.filter((person) => person.active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select className="field" style={{ width: 170 }} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as LeaveCode })}>
+        </select></label>
+        <label className="field-label" htmlFor="leave-type">Leave type<select id="leave-type" aria-label="Leave type" className="field" disabled={busy} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as LeaveCode })}>
           {LEAVE_CODES.map((c) => <option key={c} value={c}>{SHIFT[c].label}</option>)}
-        </select>
-        <input className="field" style={{ width: 150 }} type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
-        <input className="field" style={{ width: 150 }} type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
+        </select></label>
+        <label className="field-label">Start date<input className="field" type="date" disabled={busy} value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label>
+        <label className="field-label">End date<input className="field" type="date" disabled={busy} min={form.start || undefined} value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label>
         <button
           type="button"
-          className="btn small"
+          className="btn primary"
           disabled={busy || !form.staffId || !form.start || !form.end || form.start > form.end}
           onClick={() => {
             if (!form.staffId || !form.start || !form.end) return;
@@ -50,21 +51,21 @@ export function LeavePanel({ staff, leave, onAdd, onRemove }: LeavePanelProps) {
         </button>
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
-      <table className="datatable">
+      <div className="table-scroll"><table className="datatable"><thead><tr><th>Team member</th><th>Leave type</th><th>Date range</th><th>Actions</th></tr></thead>
         <tbody>
           {leave.length === 0 && (
-            <tr><td className="label panel-note" style={{ margin: 0 }}>No leave recorded.</td></tr>
+            <tr><td colSpan={4}><div className="empty">No leave planned yet. Add time away above to include it in your next roster.</div></td></tr>
           )}
           {leave.map((l) => (
             <tr key={l.id}>
               <td className="label">{byId[l.staffId] ? byId[l.staffId].name : "—"}</td>
               <td className="label">{SHIFT[l.type].label}</td>
               <td className="label">{l.start} to {l.end}</td>
-              <td><button type="button" className="btn danger small" onClick={() => { setError(null); void onRemove(l.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not remove leave.")); }}>Remove</button></td>
+              <td><button type="button" className="btn danger small" disabled={removing !== null} onClick={() => { setRemoving(l.id); setError(null); void onRemove(l.id).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not remove leave.")).finally(() => setRemoving(null)); }}>{removing === l.id ? "Removing…" : "Remove"}</button></td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }

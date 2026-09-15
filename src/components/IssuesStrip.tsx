@@ -1,4 +1,5 @@
 import type { Issue } from "../types";
+import { Icon } from "./Icon";
 
 interface IssuesStripProps {
   issues: Issue[];
@@ -10,28 +11,29 @@ export function IssuesStrip({ issues, notes }: IssuesStripProps) {
     <>
       {issues.length > 0 ? (
         <div className="notice">
-          <h3>{issues.length} rule{issues.length === 1 ? "" : "s"} not met</h3>
+          <details><summary><Icon name="info" size={18} />{issues.length} staffing issue{issues.length === 1 ? "" : "s"} to review</summary>
           <ul>
-            {issues.slice(0, 8).map((issue, i) => (
+            {issues.map((issue, i) => (
               <li key={i}>{issue.text}</li>
             ))}
-            {issues.length > 8 && <li>…and {issues.length - 8} more.</li>}
           </ul>
+          </details>
         </div>
       ) : (
         <div className="notice good">
-          <h3>Clean</h3>
-          Every rule in the staffing policy is met for this month.
+          <h3><Icon name="check" size={18} /> Your roster meets the staffing rules</h3>
+          All configured staffing checks pass for this period.
         </div>
       )}
       {notes.length > 0 && (
         <div className="notice subtle">
-          <h3>Generator notes</h3>
+          <details><summary>Generation notes</summary>
           <ul>
             {notes.map((n, i) => (
               <li key={i}>{n}</li>
             ))}
           </ul>
+          </details>
         </div>
       )}
     </>

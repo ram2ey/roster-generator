@@ -16,15 +16,17 @@ import { useAuth } from "./hooks/useAuth";
 import { useRosterState } from "./hooks/useRosterState";
 import { monthRange, stepRange } from "./lib/dateUtils";
 import type { Roster } from "./types";
+import { Brand, Icon, type IconName } from "./components/Icon";
 
-type Tab = "staff" | "rules" | "leave" | "balance" | "account";
+type Tab = "roster" | "staff" | "rules" | "leave" | "balance" | "account";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "staff", label: "Staff" },
-  { id: "rules", label: "Rules" },
-  { id: "leave", label: "Leave" },
-  { id: "balance", label: "Workload balance" },
-  { id: "account", label: "Account" },
+const TABS: { id: Tab; label: string; icon: IconName; description: string }[] = [
+  { id: "roster", label: "Duty roster", icon: "calendar", description: "A balanced schedule. A better day for your team." },
+  { id: "staff", label: "Your team", icon: "users", description: "Manage the people who make every shift possible." },
+  { id: "leave", label: "Leave planner", icon: "leave", description: "Make room for time away before planning the next shift." },
+  { id: "balance", label: "Workload", icon: "chart", description: "See how shifts and time off are shared across your team." },
+  { id: "rules", label: "Roster settings", icon: "settings", description: "Shape your schedule around the way your ward works." },
+  { id: "account", label: "Account", icon: "user", description: "Your account, your information, and your data controls." },
 ];
 
 function formatDate(iso: string): string {
@@ -72,6 +74,7 @@ function PeriodPicker({
         {saved.length > 0 && (
           <select
             className="field"
+            aria-label="Saved roster period"
             value={`${startDate}_${endDate}`}
             onChange={(e) => {
               const [s, en] = e.target.value.split("_");
@@ -87,7 +90,7 @@ function PeriodPicker({
           </select>
         )}
         <button type="button" className="btn ghost small" onClick={() => { setCustomStart(startDate); setCustomEnd(endDate); setOpen(true); }}>
-          New period
+          <Icon name="plus" size={16} /> New period
         </button>
       </div>
     );
@@ -106,9 +109,9 @@ function PeriodPicker({
           setCustomEnd(r.endDate);
         }}
       />
-      <input type="date" className="field" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+      <input type="date" aria-label="Period start date" className="field" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
       <span className="panel-note" style={{ margin: 0 }}>to</span>
-      <input type="date" className="field" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+      <input type="date" aria-label="Period end date" className="field" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
       <button
         type="button"
         className="btn small"
@@ -126,13 +129,15 @@ function PeriodPicker({
 export default function App() {
   const auth = useAuth();
   const [{ startDate, endDate }, setPeriod] = useState(todayMonthRange);
-  const [tab, setTab] = useState<Tab>("staff");
+  const [tab, setTab] = useState<Tab>("roster");
+  const [mobileNav, setMobileNav] = useState(false);
   const [billing, setBilling] = useState<{ email: string; legacyUnlimited: boolean; downloadCredits: number } | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [editingCell, setEditingCell] = useState(false);
+  const [billingRefresh, setBillingRefresh] = useState(0);
   const signedInEmail = auth.status === "authed" ? auth.email : null;
 
   useEffect(() => {
@@ -143,7 +148,7 @@ export default function App() {
       .then((status) => { if (alive) setBilling({ email, ...status }); })
       .catch((error) => { if (alive) setActionError(error instanceof Error ? error.message : "Could not load billing status."); });
     return () => { alive = false; };
-  }, [signedInEmail]);
+  }, [signedInEmail, billingRefresh]);
 
   const authed = auth.status === "authed";
   const {
@@ -162,10 +167,8 @@ export default function App() {
         onSuccess={() => {
           // Strip the query param from the URL so a refresh doesn't re-verify.
           window.history.replaceState({}, "", window.location.pathname);
+          setBillingRefresh((value) => value + 1);
           auth.confirmPaid();
-        }}
-        onFailure={() => {
-          window.history.replaceState({}, "", window.location.pathname);
         }}
       />
     );
@@ -174,9 +177,7 @@ export default function App() {
 
   if (auth.status === "loading") {
     return (
-      <div className="app">
-        <div className="empty">Loading…</div>
-      </div>
+      <div className="loading-screen" role="status"><Brand /><div className="billing-spinner" /><p>Opening your workspace…</p></div>
     );
   }
 
@@ -190,13 +191,11 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="app">
-        <div className="empty">Loading roster book…</div>
-      </div>
+      <div className="loading-screen" role="status"><Brand /><div className="billing-spinner" /><p>Getting your roster ready…</p></div>
     );
   }
 
-  if (!rules) return <div className="app"><div className="notice" role="alert">{loadError ?? "Could not load roster settings."}</div></div>;
+  if (!rules) return <div className="authshell"><div className="authcard"><h1 className="authcard-title">Unable to load your workspace</h1><p className="notice" role="alert">{loadError ?? "Could not load roster settings."}</p><button className="btn primary" onClick={() => window.location.reload()}>Try again</button></div></div>;
 
   const step = (dir: -1 | 1) => setPeriod(stepRange(startDate, endDate, dir));
   const accountBilling = billing?.email === auth.email ? billing : null;
@@ -223,112 +222,76 @@ export default function App() {
   };
 
   const handleCellClick = async (staffId: string, date: string) => {
-    if (editingCell) return;
+    if (editingCell || generating || downloading) return;
     setEditingCell(true); setActionError(null);
     try { await actions.cycleCell(staffId, date); }
     catch (e) { setActionError(e instanceof api.ApiError ? e.message : "Could not update this shift."); }
     finally { setEditingCell(false); }
   };
 
+
+  const currentView = TABS.find((item) => item.id === tab)!;
+  const busy = generating || downloading || editingCell;
+  const downloaded = !!roster?.version && roster.downloadedVersion === roster.version;
+  const navigate = (next: Tab) => { setTab(next); setMobileNav(false); };
+  const signOut = () => { void auth.logout().catch(() => setActionError("Could not sign out. Please try again.")); };
+
   return (
-    <div className="app">
-      <header className="masthead">
-        <div>
-          <p className="masthead-brand">Roster Generator</p>
-          <div className="masthead-id">
-            <button type="button" className="masthead-step" onClick={() => step(-1)} aria-label="Previous period">‹</button>
-            <h1 className="masthead-title">{periodLabel(startDate, endDate)}</h1>
-            <button type="button" className="masthead-step" onClick={() => step(1)} aria-label="Next period">›</button>
+    <div className="workspace">
+      <a className="skip-link" href="#main-content">Skip to content</a>
+      <aside className="sidebar">
+        <Brand light />
+        <div className="workspace-label"><span className="workspace-avatar"><Icon name="shield" size={18} /></span><div>Ward workspace<small>Staff scheduling</small></div></div>
+        <p className="nav-label">WORKSPACE</p>
+        <nav className="side-nav" aria-label="Main navigation">
+          {TABS.map((item) => <button key={item.id} type="button" data-active={tab === item.id} aria-current={tab === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}</span>{item.id === "staff" && <span className="nav-count">{staff.length}</span>}</button>)}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="credit-card"><Icon name="wallet" /><strong>{accountBilling?.legacyUnlimited ? "Lifetime access" : accountBilling ? accountBilling.downloadCredits + " download credits" : "Your downloads"}</strong><p>Generate freely. Download when you're ready.</p>{!accountBilling?.legacyUnlimited && <button className="btn" onClick={auth.triggerPaywall}>Get download credits <Icon name="arrow" size={16} /></button>}</div>
+          <button className="profile-button" onClick={() => navigate("account")}><span className="avatar">{auth.email.charAt(0).toUpperCase()}</span><span className="profile-copy"><strong>Your account</strong><small>{auth.email}</small></span><Icon name="right" size={16} /></button>
+          <button className="signout-button" onClick={signOut}><Icon name="logout" size={16} /> Sign out</button>
+        </div>
+      </aside>
+      <div className="workspace-main">
+        <header className="topbar">
+          <div className="mobile-brand"><Brand /></div>
+          <div className="breadcrumb">Workspace <Icon name="right" size={14} /><strong>{currentView.label}</strong></div>
+          <div className="topbar-right"><span className="secure-label"><Icon name="shield" size={16} /> Private workspace</span><button className="avatar avatar-button" aria-label="Open account" onClick={() => navigate("account")}>{auth.email.charAt(0).toUpperCase()}</button><button className="btn icon-button mobile-menu" aria-label={mobileNav ? "Close navigation" : "Open navigation"} aria-expanded={mobileNav} aria-controls="mobile-navigation" onClick={() => setMobileNav(!mobileNav)}><Icon name={mobileNav ? "close" : "menu"} /></button></div>
+        </header>
+        {mobileNav && <nav id="mobile-navigation" className="mobile-navigation" aria-label="Mobile navigation">{TABS.map((item) => <button key={item.id} data-active={tab === item.id} aria-current={tab === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} />{item.label}</button>)}<button onClick={auth.triggerPaywall}><Icon name="wallet" />Download credits</button><button onClick={signOut}><Icon name="logout" />Sign out</button></nav>}
+        <main id="main-content" className="main-content">
+          <section className="page-heading">
+            <div><p className="eyebrow">PLAN WITH CONFIDENCE</p><h1>{currentView.label}</h1><p className="page-description">{currentView.description}</p></div>
+            {tab === "roster" && <div className="page-actions"><button className="btn" disabled={!roster || busy} onClick={() => { void handleDownload(); }}><Icon name="download" size={17} />{downloading ? "Preparing…" : "Download CSV"}</button><button className="btn primary" disabled={busy || !activeStaff.length} onClick={() => { void handleGenerate(); }}><Icon name="spark" size={17} />{generating ? "Generating…" : roster ? "Generate again" : "Generate roster"}</button></div>}
+          </section>
+          {downloadError && <p className="notice" role="alert">{downloadError}</p>}
+          {(actionError || loadError) && <p className="notice" role="alert">{actionError || loadError}</p>}
+          {tab === "roster" && <>
+            <div className="stats-grid">
+              <div className="stat-card"><span className="stat-icon"><Icon name="users" /></span><span className="stat-label">Active team</span><strong>{activeStaff.length}<small>staff members</small></strong><span className="stat-caption">Ready to be scheduled</span></div>
+              <div className="stat-card"><span className="stat-icon blue"><Icon name="calendar" /></span><span className="stat-label">Planning period</span><strong>{days.length}<small>days</small></strong><span className="stat-caption">{formatDate(startDate)} – {formatDate(endDate)}</span></div>
+              <div className="stat-card"><span className="stat-icon purple"><Icon name="leave" /></span><span className="stat-label">Leave this period</span><strong>{leave.filter((item) => item.start <= endDate && item.end >= startDate).length}<small>records</small></strong><span className="stat-caption">Considered in new generations</span></div>
+              <div className="stat-card"><span className="stat-icon amber"><Icon name="wallet" /></span><span className="stat-label">Download credits</span><strong>{accountBilling?.legacyUnlimited ? "Unlimited" : accountBilling?.downloadCredits ?? "—"}<small>{!accountBilling?.legacyUnlimited && "available"}</small></strong><button className="text-button" onClick={accountBilling?.legacyUnlimited ? () => navigate("account") : auth.triggerPaywall}>{accountBilling?.legacyUnlimited ? "View account" : "Get more credits"} <Icon name="arrow" size={14} /></button></div>
+            </div>
+            <section className="roster-card" aria-label="Roster preview">
+              <div className="roster-toolbar"><div className="period-title"><span className="period-icon"><Icon name="calendar" /></span><div><h2>{periodLabel(startDate, endDate)}</h2><span className="panel-note">{roster ? "Your team's shift schedule" : "Start planning your next roster"}</span></div><span className={downloaded ? "badge green" : "badge"}>{downloaded ? "Downloaded" : roster ? "Draft" : "Not generated"}</span></div><div className="period-controls"><button className="btn icon-button" aria-label="Previous period" disabled={busy} onClick={() => step(-1)}><Icon name="left" size={16} /></button><button className="btn icon-button" aria-label="Next period" disabled={busy} onClick={() => step(1)}><Icon name="right" size={16} /></button></div></div>
+              <div className="period-picker"><PeriodPicker startDate={startDate} endDate={endDate} rosters={rosters} onSelect={(s, e) => setPeriod({ startDate: s, endDate: e })} /><span className="saved-label"><Icon name="check" size={14} />{monthsOnRecord} saved period{monthsOnRecord === 1 ? "" : "s"}</span></div>
+              {roster ? <RosterBoard staff={activeStaff} days={days} roster={roster} rules={rules} issues={issues} disabled={busy} onCellClick={(staffId, date) => { void handleCellClick(staffId, date); }} /> :
+                <div className="empty roster-empty"><span className="empty-icon"><Icon name="calendar" size={30} /></span><h3>A fresh start for your next schedule</h3><p>{activeStaff.length ? "Your team is ready. Generate a roster, review the shifts, and make it your own." : "Add your team and set your staffing rules. We'll help you turn them into a balanced roster."}</p><button className="btn primary" onClick={activeStaff.length ? () => { void handleGenerate(); } : () => navigate("staff")} disabled={busy}><Icon name={activeStaff.length ? "spark" : "plus"} size={17} />{activeStaff.length ? "Generate your roster" : "Add your team"}</button><span className="empty-footnote">Free to generate · Pay only when you download</span></div>}
+              <div className="legend">{(["M", "A", "N", "X", "H", "AL", "ML", "SL"] as const).map((code) => <span className="legend-chip" key={code}><span className="legend-swatch" style={{ background: SHIFT[code].bg, color: SHIFT[code].fg }}>{code}</span>{SHIFT[code].label}</span>)}<span className="legend-status">{editingCell ? "Saving shift…" : "Select a shift to edit"}</span></div>
+            </section>
+            {downloaded && <div className="notice subtle"><Icon name="info" size={18} /> This version is available to download again at no extra cost. Editing or regenerating creates a new draft that needs one credit to download.</div>}
+            {roster && <IssuesStrip issues={issues} notes={roster.notes} />}
+            <div className="workflow-note"><span><Icon name="lock" size={16} /> Your roster stays in your private workspace.</span><span>Generate. Review. Download.</span></div>
+          </>}
+          <div className="panels">
+            {tab === "staff" && <StaffPanel staff={staff} onAddBulk={actions.addStaffBulk} onUpdate={actions.updateStaff} onRemove={actions.removeStaff} />}
+            {tab === "rules" && <RulesPanel rules={rules} holidays={holidays} onUpdateRules={actions.updateRules} onAddHoliday={actions.addHoliday} onRemoveHoliday={actions.removeHoliday} />}
+            {tab === "leave" && <LeavePanel staff={staff} leave={leave} onAdd={actions.addLeave} onRemove={actions.removeLeave} />}
+            {tab === "balance" && <BalancePanel staff={activeStaff} history={history} roster={roster} />}
+            {tab === "account" && <AccountPanel email={auth.email} onDeleted={auth.confirmAccountDeleted} />}
           </div>
-          <p className="masthead-meta">
-            {activeStaff.length} active staff · {days.length} days · {monthsOnRecord} period{monthsOnRecord === 1 ? "" : "s"} on record
-            {roster ? ` · ${issues.length} issue${issues.length === 1 ? "" : "s"}` : " · not generated"}
-            {roster?.edited && <span className="edited"> · edited by hand</span>}
-          </p>
-          {accountBilling && <p className="masthead-meta">{accountBilling.legacyUnlimited ? "Lifetime download access" : `${accountBilling.downloadCredits} download credit${accountBilling.downloadCredits === 1 ? "" : "s"} remaining`}</p>}
-          <div style={{ marginTop: 8 }}>
-            <PeriodPicker startDate={startDate} endDate={endDate} rosters={rosters} onSelect={(s, e) => setPeriod({ startDate: s, endDate: e })} />
-          </div>
-        </div>
-        <div className="masthead-actions">
-          <button type="button" className="btn primary" disabled={generating || downloading} onClick={() => { void handleGenerate(); }}>
-            {generating ? "Generating…" : roster ? "Generate again" : "Generate roster"}
-          </button>
-          {roster && (
-            <button type="button" className="btn" disabled={downloading || generating} onClick={() => { void handleDownload(); }}>{downloading ? "Preparing download…" : "Download CSV"}</button>
-          )}
-          {!accountBilling?.legacyUnlimited && <button type="button" className="btn ghost small" onClick={auth.triggerPaywall}>Buy credits</button>}
-          <button type="button" className="btn ghost small" onClick={auth.logout}>
-            Sign out ({auth.email})
-          </button>
-        </div>
-      </header>
-
-      {downloadError && <p className="notice" role="alert">{downloadError}</p>}
-      {(actionError || loadError) && <p className="notice" role="alert">{actionError || loadError}</p>}
-
-      {roster?.version && roster.downloadedVersion === roster.version && (
-        <div className="notice subtle">This version has been downloaded. Changing a shift or generating again opens a new draft that will need one credit when downloaded.</div>
-      )}
-
-      {roster && <IssuesStrip issues={issues} notes={roster.notes} />}
-
-      {!roster ? (
-        <div className="empty" style={{ marginTop: 16 }}>
-          No roster for {periodLabel(startDate, endDate)} yet. Set your staff and rules below, then generate.
-        </div>
-      ) : (
-        <div style={{ marginTop: 16 }}>
-          <RosterBoard
-            staff={activeStaff} days={days} roster={roster} rules={rules} issues={issues}
-            onCellClick={(staffId, date) => { void handleCellClick(staffId, date); }}
-          />
-        </div>
-      )}
-
-      <div className="legend">
-        {(["M", "A", "N", "X", "H", "AL"] as const).map((c) => (
-          <span className="legend-chip" key={c}>
-            <span className="legend-swatch" style={{ background: SHIFT[c].bg, color: SHIFT[c].fg }}>{c}</span>
-            {SHIFT[c].label}
-          </span>
-        ))}
-        <span className="legend-status">Click a cell to change it.</span>
-      </div>
-
-      <nav className="tabstrip">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" className="tab" data-active={tab === t.id} onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </nav>
-
-      <div className="panels">
-        {tab === "staff" && (
-          <StaffPanel
-            staff={staff}
-            onAddBulk={actions.addStaffBulk}
-            onUpdate={actions.updateStaff}
-            onRemove={actions.removeStaff}
-          />
-        )}
-        {tab === "rules" && (
-          <RulesPanel
-            rules={rules}
-            holidays={holidays}
-            onUpdateRules={actions.updateRules}
-            onAddHoliday={actions.addHoliday}
-            onRemoveHoliday={actions.removeHoliday}
-          />
-        )}
-        {tab === "leave" && (
-          <LeavePanel staff={staff} leave={leave} onAdd={actions.addLeave} onRemove={actions.removeLeave} />
-        )}
-        {tab === "balance" && (
-          <BalancePanel staff={activeStaff} history={history} roster={roster} />
-        )}
-        {tab === "account" && <AccountPanel email={auth.email} onDeleted={auth.confirmAccountDeleted} />}
+        </main>
       </div>
     </div>
   );

@@ -10,9 +10,10 @@ interface RosterBoardProps {
   rules: Rules;
   issues: Issue[];
   onCellClick: (staffId: string, iso: string) => void;
+  disabled?: boolean;
 }
 
-export function RosterBoard({ staff, days, roster, rules, issues, onCellClick }: RosterBoardProps) {
+export function RosterBoard({ staff, days, roster, rules, issues, onCellClick, disabled }: RosterBoardProps) {
   const flagged = useMemo(() => {
     const m = new Set<string>();
     issues.forEach((i) => m.add(i.staffId ? `${i.staffId}|${i.iso}` : i.iso));
@@ -25,13 +26,14 @@ export function RosterBoard({ staff, days, roster, rules, issues, onCellClick }:
   return (
     <div className="board">
       <table className="gridtable">
+        <caption className="sr-only">Duty roster from {days[0]?.iso} to {days.at(-1)?.iso}. Select a shift to cycle its assignment.</caption>
         <thead>
           <tr className="gt-head">
-            <th className="gt-name">Staff</th>
+            <th className="gt-name" scope="col">Team member</th>
             {days.map((d) => (
-              <th key={d.iso} className={d.isWeekend ? "gt-weekend" : ""}>
+              <th key={d.iso} scope="col" className={d.isWeekend ? "gt-weekend" : ""}>
                 {d.day}
-                <span className="gt-dow">{d.dowLabel[0]}</span>
+                <span className="gt-dow">{d.dowLabel}</span>
               </th>
             ))}
           </tr>
@@ -39,7 +41,7 @@ export function RosterBoard({ staff, days, roster, rules, issues, onCellClick }:
         <tbody>
           {staff.map((s) => (
             <tr key={s.id}>
-              <th className="gt-name" title={s.name}>{s.name}</th>
+              <th className="gt-name" scope="row" title={s.name}><div className="staff-cell"><span className="staff-avatar" aria-hidden="true">{s.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><span>{s.name}</span></div></th>
               {days.map((d) => {
                 const code = (roster.grid[s.id] && roster.grid[s.id][d.iso]) || "";
                 const sh = code ? SHIFT[code] : undefined;
@@ -48,18 +50,8 @@ export function RosterBoard({ staff, days, roster, rules, issues, onCellClick }:
                   <td
                     key={d.iso}
                     className={`gt-cell ${isFlagged ? "flagged" : ""} ${d.isWeekend && !sh ? "gt-weekend" : ""}`}
-                    style={sh ? { background: sh.bg, color: sh.fg } : undefined}
-                    onClick={() => onCellClick(s.id, d.iso)}
-                    title={`${s.name} · ${d.dowLabel} ${d.day} · ${sh ? sh.label : "—"}`}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onCellClick(s.id, d.iso);
-                      }
-                    }}
                   >
-                    {code}
+                    <button type="button" className="shift-button" disabled={disabled || sh?.counts === "leave"} style={sh ? { background: sh.bg, color: sh.fg } : undefined} onClick={() => onCellClick(s.id, d.iso)} aria-label={`${s.name}, ${d.iso}, ${sh?.label ?? "Unassigned"}${isFlagged ? ", staffing issue" : ""}`} title={`${s.name} · ${d.dowLabel} ${d.day} · ${sh?.label ?? "Unassigned"}`}>{code || "·"}</button>
                   </td>
                 );
               })}

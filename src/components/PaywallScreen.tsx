@@ -1,9 +1,10 @@
 import { useState } from "react";
 import * as api from "../data/api";
+import { Brand, Icon } from "./Icon";
 
 interface PaywallScreenProps {
   email: string;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
   onPaid: () => void;
   onBack: () => void;
 }
@@ -18,6 +19,7 @@ export function PaywallScreen({ email, onLogout, onPaid, onBack }: PaywallScreen
   const [busy, setBusy] = useState<api.PackageId | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const signOut = () => { void onLogout().catch(() => setError("Could not sign out. Please try again.")); };
 
   const handlePay = async (packageId: api.PackageId) => {
     setBusy(packageId);
@@ -45,33 +47,29 @@ export function PaywallScreen({ email, onLogout, onPaid, onBack }: PaywallScreen
     }
   };
 
+
+  const names = { one: "One roster", six: "Team essentials", twelve: "Plan ahead" };
+  const descriptions = { one: "For your next finished schedule.", six: "Keep your team's planning moving.", twelve: "More room for the months ahead." };
   return (
-    <div className="authshell">
-      <div className="paywallcard">
-        <p className="masthead-brand" style={{ margin: "0 0 12px", textAlign: "center" }}>Roster Generator</p>
-        <div className="paywall-badge">Pay before download</div>
-        <h1 className="authcard-title">Choose a download package</h1>
-        <p className="panel-note">Generate and edit rosters freely. One credit downloads one generated roster version. You can download that version again without using another credit.</p>
-
+    <div className="billing-layout">
+      <header className="billing-header"><Brand /><button className="btn ghost" onClick={onBack}><Icon name="left" size={17} /> Back to workspace</button></header>
+      <main className="billing-content">
+        <div className="pricing-intro"><p className="eyebrow">READY WHEN YOU ARE</p><h1>Good plans deserve<br />a clean finish.</h1><p>Generate and edit as much as you need. Choose your download credits when your roster is ready to share.</p></div>
         <div className="package-list">
-          {PACKAGES.map((item) => (
-            <button key={item.id} type="button" className="package-option" onClick={() => handlePay(item.id)} disabled={busy !== null}>
-              <span>{item.credits} {item.credits === 1 ? "generation" : "generations"}</span>
-              <strong>GHS {item.price}</strong>
-            </button>
-          ))}
+          {PACKAGES.map((item) => <article key={item.id} className={"package-option" + (item.id === "six" ? " featured" : "")}>
+            {item.id === "six" && <span className="package-ribbon">Recommended for teams</span>}
+            <h2>{names[item.id]}</h2><p className="package-description">{descriptions[item.id]}</p>
+            <div className="package-price"><small>GH₵</small>{item.price}</div>
+            <p className="package-credits">{item.credits} download credit{item.credits === 1 ? "" : "s"} · One-time payment</p>
+            <ul className="package-features"><li><Icon name="check" size={16} />{item.credits} roster version{item.credits === 1 ? "" : "s"} to download</li><li><Icon name="check" size={16} />Unlimited generation and editing</li><li><Icon name="check" size={16} />Free repeat downloads of that version</li><li><Icon name="check" size={16} />CSV with your facility details</li></ul>
+            <button className={"btn" + (item.id === "six" ? " primary" : "")} disabled={busy !== null || refreshing} onClick={() => { void handlePay(item.id); }}>{busy === item.id ? "Opening checkout…" : "Choose " + item.credits + (item.credits === 1 ? " credit" : " credits")}<Icon name="arrow" size={16} /></button>
+          </article>)}
         </div>
-        {busy && <p className="panel-note">Redirecting to Paystack…</p>}
-        {error && <p className="authcard-error" style={{ marginBottom: 12 }}>{error}</p>}
-
-        <button type="button" className="btn ghost small" onClick={refreshAccess} disabled={refreshing || busy !== null}>
-          {refreshing ? "Checking payment…" : "I already paid — refresh access"}
-        </button>
-        <div className="row" style={{ marginTop: 14 }}>
-          <button type="button" className="btn ghost small" onClick={onBack}>Back to roster</button>
-          <button type="button" className="btn ghost small" onClick={onLogout}>Sign out ({email})</button>
-        </div>
-      </div>
+        <div className="billing-reassurance"><span><Icon name="shield" size={16} /> Secure checkout with Paystack</span><span><Icon name="wallet" size={16} /> Pay in Ghana cedis</span><span><Icon name="check" size={16} /> No subscription</span></div>
+        {busy && <p className="notice subtle" role="status">Opening Paystack to complete your payment…</p>}
+        {error && <p className="notice" role="alert">{error}</p>}
+        <div className="billing-footer"><button className="btn ghost" onClick={() => { void refreshAccess(); }} disabled={refreshing || busy !== null}>{refreshing ? "Checking payment…" : "Already paid? Refresh your credits"}</button><p className="panel-note">One credit unlocks one roster version. Editing a downloaded version creates a new draft.<br />Signed in as {email}</p><button className="text-button" onClick={signOut}>Sign out</button></div>
+      </main>
     </div>
   );
 }

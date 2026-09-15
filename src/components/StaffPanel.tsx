@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Staff } from "../types";
+import { Icon } from "./Icon";
 
 interface StaffPanelProps {
   staff: Staff[];
@@ -48,9 +49,9 @@ function StaffRow({ person, onUpdate, onRemove }: {
 
   return (
     <tr>
-      <td className="label"><input className="field" value={draft.name} maxLength={120} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></td>
-      <td><input className="field" placeholder="e.g. SNO" value={draft.rank} maxLength={80} onChange={(e) => setDraft({ ...draft, rank: e.target.value })} /></td>
-      <td><select className="field" value={draft.sex} onChange={(e) => setDraft({ ...draft, sex: e.target.value as "M" | "F" })}><option value="M">Male</option><option value="F">Female</option></select></td>
+      <td className="label"><input aria-label={`Name for ${person.name}`} disabled={busy} className="field" value={draft.name} maxLength={120} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></td>
+      <td><input aria-label={`Rank for ${person.name}`} disabled={busy} className="field" placeholder="e.g. SNO" value={draft.rank} maxLength={80} onChange={(e) => setDraft({ ...draft, rank: e.target.value })} /></td>
+      <td><select aria-label={`Sex for ${person.name}`} disabled={busy} className="field" value={draft.sex} onChange={(e) => setDraft({ ...draft, sex: e.target.value as "M" | "F" })}><option value="M">Male</option><option value="F">Female</option></select></td>
       <td><input aria-label={`${person.name} fixed morning`} type="checkbox" checked={draft.fixedMorning} onChange={(e) => setDraft({ ...draft, fixedMorning: e.target.checked })} /></td>
       <td><input aria-label={`${person.name} night eligible`} type="checkbox" checked={draft.nightEligible} onChange={(e) => setDraft({ ...draft, nightEligible: e.target.checked })} /></td>
       <td><input aria-label={`${person.name} active`} type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /></td>
@@ -66,14 +67,17 @@ function StaffRow({ person, onUpdate, onRemove }: {
 }
 
 export function StaffPanel({ staff, onAddBulk, onUpdate, onRemove }: StaffPanelProps) {
+  const [search, setSearch] = useState("");
+  const filtered = staff.filter((person) => (person.name + " " + person.rank).toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="panel wide">
-      <h3>Staff</h3>
+      <div className="panel-header"><h3>Team directory</h3><span className="badge neutral">{staff.length} team members</span></div>
       <p className="panel-note">Inactive staff remain on record but are excluded from new rosters. Edit a row, then save it.</p>
-      <table className="datatable">
+      <label className="search-field"><Icon name="search" size={17} /><input className="field" aria-label="Search team by name or rank" placeholder="Search by name or rank…" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
+      <div className="table-scroll"><table className="datatable staff-table">
         <thead><tr><th>Name</th><th>Rank</th><th>Sex</th><th>Fixed morning</th><th>Night eligible</th><th>Active</th><th></th></tr></thead>
-        <tbody>{staff.map((person) => <StaffRow key={person.id} person={person} onUpdate={onUpdate} onRemove={onRemove} />)}</tbody>
-      </table>
+        <tbody>{filtered.map((person) => <StaffRow key={person.id} person={person} onUpdate={onUpdate} onRemove={onRemove} />)}{!filtered.length && <tr><td colSpan={7}><div className="empty">{search ? "No team members match your search." : "Your team starts here. Add your first staff members below."}</div></td></tr>}</tbody>
+      </table></div>
       <AddStaff onAdd={onAddBulk} />
     </div>
   );
@@ -92,9 +96,10 @@ function AddStaff({ onAdd }: { onAdd: StaffPanelProps["onAddBulk"] }) {
     finally { setBusy(false); }
   };
   return (
-    <div className="stack" style={{ marginTop: 12, maxWidth: 420 }}>
+    <div className="stack add-staff">
+      <h3>Add to your team</h3>
       <p className="panel-note" style={{ margin: 0 }}>Add staff, one name per line or comma-separated. Up to 200 staff can be added at once.</p>
-      <textarea className="field" rows={3} maxLength={24_000} placeholder={"Ama Serwaa\nKofi Boateng\nEsi Mensah"} value={raw} onChange={(e) => setRaw(e.target.value)} />
+      <textarea aria-label="Names of staff to add" disabled={busy} className="field" rows={3} maxLength={24_000} placeholder={"Ama Serwaa\nKofi Boateng\nEsi Mensah"} value={raw} onChange={(e) => setRaw(e.target.value)} />
       <button type="button" className="btn small" disabled={!names.length || busy} onClick={() => { void submit(); }}>{busy ? "Adding…" : `Add ${names.length || ""} staff`}</button>
       {error && <span className="field-error" role="alert">{error}</span>}
     </div>

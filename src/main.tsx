@@ -4,9 +4,6 @@ import { createRoot } from "react-dom/client";
 // Latin-only subsets: staff names and UI copy are English, and shipping
 // every Cyrillic/Greek/Vietnamese subset fontsource bundles by default would
 // needlessly bloat the deployed build.
-import "@fontsource/fraunces/latin-600.css";
-import "@fontsource/fraunces/latin-600-italic.css";
-import "@fontsource/fraunces/latin-700.css";
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";

@@ -29,13 +29,13 @@ export function AccountPanel({ email, onDeleted }: { email: string; onDeleted: (
   };
 
   return <div className="panel wide">
-    <h3>Account and data</h3>
+    <div className="account-summary"><span className="avatar">{email.charAt(0).toUpperCase()}</span><div><strong>{email}</strong><small>Ward workspace administrator</small></div></div><h3>Your data, in your hands</h3>
     <p className="panel-note">Signed in as {email}. Export a complete copy before applying your organization’s retention or deletion policy.</p>
     <button type="button" className="btn" disabled={busy !== null} onClick={() => { void exportData(); }}>{busy === "export" ? "Preparing export…" : "Export account data"}</button>
     <div className="danger-zone">
       <h3>Delete account</h3>
-      <p className="panel-note">This permanently deletes staff, leave, rosters, immutable downloads, billing records, and sessions.</p>
-      <div className="row"><input className="field" type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} /><input className="field" placeholder="Type DELETE" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /><button type="button" className="btn danger" disabled={busy !== null || !password || confirmation !== "DELETE"} onClick={() => { void deleteAccount(); }}>{busy === "delete" ? "Deleting…" : "Delete account permanently"}</button></div>
+      <p className="panel-note">This permanently deletes your team, leave, rosters, saved downloads, and billing records. This cannot be undone.</p>
+      <div className="row"><input aria-label="Current password to confirm account deletion" className="field" type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} /><input aria-label="Type DELETE to confirm" className="field" placeholder="Type DELETE" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /><button type="button" className="btn danger" disabled={busy !== null || !password || confirmation !== "DELETE"} onClick={() => { void deleteAccount(); }}>{busy === "delete" ? "Deleting…" : "Delete account permanently"}</button></div>
     </div>
     {message && <p className="panel-note" role="status">{message}</p>}
   </div>;

@@ -1,99 +1,29 @@
-/* ---------------------------------------------------------------------------
- * Design tokens — "ward board": the roster read as a printed schedule
- * pinned to a wall, not a SaaS dashboard. Warm paper ground, structural
- * rules instead of shadowed cards, a serif masthead, tabular-figure
- * monospace for the grid itself.
- * ------------------------------------------------------------------------ */
-
 :root {
-  --paper: #faf7f1;
-  --surface: #ffffff;
-  --ink: #1c1815;
-  --ink-soft: #433d36;
-  --muted: #7a726a;
-  --line: #e3ddd0;
-  --line-strong: #1c1815;
-  --weekend-wash: #efe9db;
-
-  --accent: #22314f;
-  --accent-soft: #eef1f6;
-  --flag: #ab2b20;
-  --flag-soft: #faf0ee;
-  --good: #24594c;
-  --good-soft: #edf4f1;
-
-  --shift-m-bg: #e8a53c;
-  --shift-m-fg: #2c1c00;
-  --shift-a-bg: #2f8378;
-  --shift-a-fg: #f6fbfa;
-  --shift-n-bg: #232f4e;
-  --shift-n-fg: #f3f5fb;
-  --shift-x-bg: #e8e2d3;
-  --shift-x-fg: #635b50;
-  --shift-h-bg: #c9addb;
-  --shift-h-fg: #2e1e45;
-
-  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --paper: #f5f7f9; --surface: #fff; --ink: #192b3c; --ink-soft: #405264; --muted: #627285;
+  --line: #e7ecf0; --line-strong: #cdd7df; --weekend-wash: #f3f6f8;
+  --accent: #087f75; --accent-hover: #06675f; --accent-soft: #e8f5f1; --navy: #132b3b;
+  --flag: #b44334; --flag-soft: #fff2ed; --good: #147052; --good-soft: #eaf6ee;
+  --shift-m-bg: #fff1d6; --shift-m-fg: #875a0a;
+  --shift-a-bg: #dff2eb; --shift-a-fg: #176348;
+  --shift-n-bg: #e8eafa; --shift-n-fg: #515495;
+  --shift-x-bg: #edf1f5; --shift-x-fg: #617083;
+  --shift-h-bg: #f3e8f7; --shift-h-fg: #875393;
   --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
-
-  --radius: 3px;
-  color-scheme: light;
+  --font-display: var(--font-sans); --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius: 9px; color-scheme: light;
 }
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  font-variant-numeric: tabular-nums;
-}
-
-#root {
-  min-height: 100%;
-}
-
-::selection {
-  background: var(--shift-n-bg);
-  color: var(--shift-n-fg);
-}
-
-button,
-input,
-select {
-  font-family: inherit;
-  color: inherit;
-}
-
-input[type="checkbox"] {
-  accent-color: var(--ink);
-  width: 15px;
-  height: 15px;
-}
-
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-h1,
-h2,
-h3 {
-  margin: 0;
-}
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+::selection { background: #b9e4da; color: var(--ink); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+input[type="checkbox"] { accent-color: var(--accent); width: 18px; height: 18px; cursor: pointer; }
+:focus-visible { outline: 3px solid #39a99b; outline-offset: 3px; }
+h1, h2, h3, p { margin-top: 0; }
+h1, h2, h3 { line-height: 1.25; }
+a { color: var(--accent); }
+button, a, input, select, textarea { touch-action: manipulation; }
+.icon { flex-shrink: 0; vertical-align: middle; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

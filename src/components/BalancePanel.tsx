@@ -23,25 +23,25 @@ export function BalancePanel({ staff, history, roster }: BalancePanelProps) {
     <div className="panel wide">
       <h3>Workload balance</h3>
       <p className="panel-note">
-        Past totals cover every other month saved here. Whoever carries the lightest night load goes
+        Compare the current period with your saved roster history. Whoever carries the lightest night load goes
         into the next night block first, which is what keeps consecutive months from repeating.
       </p>
-      <table className="datatable">
+      <div className="table-scroll"><table className="datatable">
         <thead>
           <tr>
-            <th>Staff</th>
+            <th>Team member</th><th>Current shift mix</th>
             <th className="num">Nights so far</th>
             <th className="num">Afternoons so far</th>
             <th className="num">Weekend offs so far</th>
-            <th className="num">Nights this month</th>
-            <th className="num">Afternoons this month</th>
-            <th className="num">Days off this month</th>
+            <th className="num">Nights this period</th>
+            <th className="num">Afternoons this period</th>
+            <th className="num">Days off this period</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody>{!rows.length && <tr><td colSpan={8}><div className="empty">Add your team to start comparing workloads.</div></td></tr>}
           {rows.map(({ s, h, cur }) => (
             <tr key={s.id}>
-              <td className="label">{s.name}</td>
+              <td className="label">{s.name}</td><td><div className="workload-bars" role="img" aria-label={`${cur.M} mornings, ${cur.A} afternoons, ${cur.N} nights, ${cur.off} days off`}>{(["M", "A", "N", "off"] as const).map((code) => <span key={code} style={{ flex: cur[code], background: code === "M" ? "#ecc578" : code === "A" ? "#75bca3" : code === "N" ? "#9798cd" : "#d8e0e7" }} />)}</div></td>
               <td className="num">{h.N}</td>
               <td className="num">{h.A}</td>
               <td className="num">{h.weekendOff}</td>
@@ -51,7 +51,7 @@ export function BalancePanel({ staff, history, roster }: BalancePanelProps) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }

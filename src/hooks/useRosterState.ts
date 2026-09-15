@@ -110,11 +110,12 @@ export function useRosterState(
       a.download = `roster-${startDate}_${endDate}.csv`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await reload();
     } catch (e) {
       if (e instanceof api.ApiError && e.status === 402) onPaywallTriggered();
       else throw e;
     }
-  }, [roster, startDate, endDate, onPaywallTriggered]);
+  }, [roster, startDate, endDate, onPaywallTriggered, reload]);
 
   const addStaffBulk = useCallback(async (names: string[]) => { await api.addStaffBulk(names); await reload(); }, [reload]);
   const updateStaff = useCallback(

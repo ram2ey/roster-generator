@@ -28,9 +28,9 @@ export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRem
   return (
     <>
       <div className="panel">
-        <h3>Roster settings</h3>
+        <h3>Make it work for your ward</h3>
         <p className="panel-note">Changes apply to new drafts. Previously downloaded files remain unchanged.</p>
-        <div className="stack">
+        <fieldset className="stack form-fieldset" disabled={busy}><legend className="sr-only">Roster settings</legend>
           <label className="form-row"><span>Hospital name</span><input className="field" value={draft.hospitalName} maxLength={160} onChange={(e) => setDraft({ ...draft, hospitalName: e.target.value })} /></label>
           <label className="form-row"><span>Ward name</span><input className="field" value={draft.wardName} maxLength={160} onChange={(e) => setDraft({ ...draft, wardName: e.target.value })} /></label>
           <label className="form-row"><span>Support-band ranks</span><input className="field" value={rankText} maxLength={500} placeholder="e.g. SUP/HA, WO" onChange={(e) => { const raw = e.target.value; setRankText(raw); setDraft({ ...draft, supportRanks: [...new Set(raw.split(",").map((rank) => rank.trim()).filter(Boolean))] }); }} /></label>
@@ -40,13 +40,13 @@ export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRem
           <label className="checkline"><input type="checkbox" checked={draft.allowTwoMaleNight} onChange={(e) => setDraft({ ...draft, allowTwoMaleNight: e.target.checked })} />Accept a night team of 2 when both are male</label>
           <button type="button" className="btn primary" disabled={!changed || busy || draft.minNight < 1 || draft.minAfternoon < 1} onClick={() => { void save(); }}>{busy ? "Saving…" : "Save roster settings"}</button>
           {error && <span className="field-error" role="alert">{error}</span>}
-        </div>
+        </fieldset>
       </div>
 
       <div className="panel">
         <h3>Public holidays</h3>
         <p className="panel-note">Days marked here show as H instead of X and count towards weekly entitlement.</p>
-        <div className="stack">{holidays.map((holiday) => <HolidayRow key={holiday.id} holiday={holiday} onRemove={onRemoveHoliday} />)}</div>
+        <div className="stack">{!holidays.length && <p className="panel-note">No holidays added yet. Add the dates your team observes below.</p>}{holidays.map((holiday) => <HolidayRow key={holiday.id} holiday={holiday} onRemove={onRemoveHoliday} />)}</div>
         <HolidayAdd onAdd={onAddHoliday} />
       </div>
     </>
@@ -77,7 +77,7 @@ function HolidayAdd({ onAdd }: { onAdd: RulesPanelProps["onAddHoliday"] }) {
     finally { setBusy(false); }
   };
   return <div className="stack" style={{ marginTop: 12 }}>
-    <div className="row tight"><input className="field" type="date" value={date} onChange={(e) => setDate(e.target.value)} /><input className="field" maxLength={120} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} /><button type="button" className="btn small" disabled={!date || busy} onClick={() => { void submit(); }}>{busy ? "Adding…" : "Add holiday"}</button></div>
+    <div className="row tight"><input aria-label="Holiday date" className="field" type="date" value={date} onChange={(e) => setDate(e.target.value)} /><input aria-label="Holiday name" className="field" maxLength={120} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} /><button type="button" className="btn small" disabled={!date || busy} onClick={() => { void submit(); }}>{busy ? "Adding…" : "Add holiday"}</button></div>
     {error && <span className="field-error" role="alert">{error}</span>}
   </div>;
 }
