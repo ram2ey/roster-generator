@@ -4,7 +4,7 @@ import * as api from "../data/api";
 type AuthState =
   | { status: "loading" }
   | { status: "anon" }
-  | { status: "authed"; email: string; paid: boolean }
+  | { status: "authed"; email: string }
   | { status: "paywall"; email: string };
 
 /** Whether there's a valid session, checked once on load via the signed
@@ -16,9 +16,9 @@ export function useAuth() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.me(), api.getBillingStatus()])
-      .then(([user, billing]) => {
-        if (alive) setState({ status: "authed", email: user.email, paid: billing.paid });
+    api.me()
+      .then((user) => {
+        if (alive) setState({ status: "authed", email: user.email });
       })
       .catch(() => { if (alive) setState({ status: "anon" }); });
     return () => { alive = false; };
@@ -28,7 +28,7 @@ export function useAuth() {
     setError(null);
     try {
       const r = await api.signup(email, password);
-      setState({ status: "authed", email: r.email, paid: false });
+      setState({ status: "authed", email: r.email });
     } catch (e) {
       setError(e instanceof api.ApiError ? e.message : "Something went wrong. Try again.");
       throw e;
@@ -38,12 +38,8 @@ export function useAuth() {
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
     try {
-      // Login sets the HttpOnly session cookie in its response. Do not request
-      // billing in parallel: that request would leave before the browser has
-      // stored the new cookie and would correctly receive a 401.
       const r = await api.login(email, password);
-      const billing = await api.getBillingStatus();
-      setState({ status: "authed", email: r.email, paid: billing.paid });
+      setState({ status: "authed", email: r.email });
     } catch (e) {
       setError(e instanceof api.ApiError ? e.message : "Something went wrong. Try again.");
       throw e;
@@ -55,7 +51,7 @@ export function useAuth() {
     setState({ status: "anon" });
   }, []);
 
-  // Called by useRosterState when a 402 is received from the generate endpoint.
+  // A download without credits opens the package selector.
   const triggerPaywall = useCallback(() => {
     setState((prev) => {
       if (prev.status === "authed") return { status: "paywall", email: prev.email };
@@ -63,14 +59,17 @@ export function useAuth() {
     });
   }, []);
 
-  // Called by BillingCallback after a successful verify — upgrades the session
-  // back to "authed" with paid = true so the app unlocks immediately.
+  // Called after checkout to return to the roster.
   const confirmPaid = useCallback(() => {
     setState((prev) => {
       const email = prev.status === "paywall" || prev.status === "authed" ? prev.email : "";
-      return { status: "authed", email, paid: true };
+      return { status: "authed", email };
     });
   }, []);
 
-  return { ...state, error, signup, login, logout, triggerPaywall, confirmPaid };
+  const dismissPaywall = useCallback(() => {
+    setState((prev) => prev.status === "paywall" ? { status: "authed", email: prev.email } : prev);
+  }, []);
+
+  return { ...state, error, signup, login, logout, triggerPaywall, confirmPaid, dismissPaywall };
 }

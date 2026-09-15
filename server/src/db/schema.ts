@@ -12,16 +12,14 @@ export const facilities = pgTable("facilities", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 
   // --- Billing ---
-  // paid: permanently true once a Paystack payment has been verified. False
-  // means the facility is on the free tier (limited to generationCount < 1).
+  // Legacy lifetime access is preserved for accounts that bought it.
   paid: boolean("paid").notNull().default(false),
   // Reference returned by Paystack after a successful charge — kept for
   // audit purposes and to guard against double-processing the same reference.
   paystackRef: text("paystack_ref"),
-  // Tracks how many roster-generation actions have been made. Used to
-  // enforce the 1-free-generation limit for unpaid facilities. Incremented
-  // atomically on success; never decremented.
+  // Historical generation counter retained for reporting.
   generationCount: integer("generation_count").notNull().default(0),
+  downloadCredits: integer("download_credits").notNull().default(0),
 }, (t) => [uniqueIndex("facilities_paystack_ref_unique").on(t.paystackRef)]);
 
 // Each checkout is recorded before the user is redirected to Paystack. This
@@ -31,6 +29,7 @@ export const billingPayments = pgTable("billing_payments", {
   reference: text("reference").primaryKey(),
   facilityId: text("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
   amount: integer("amount").notNull(),
+  credits: integer("credits").notNull().default(0),
   currency: text("currency").notNull(),
   status: text("status", { enum: ["initialized", "paid"] }).notNull().default("initialized"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -102,4 +101,6 @@ export const rosters = pgTable("rosters", {
   generatedAt: text("generated_at").notNull(),
   edited: boolean("edited").notNull().default(false),
   notes: jsonb("notes").$type<string[]>().notNull(),
+  version: integer("version").notNull().default(1),
+  downloadedVersion: integer("downloaded_version").notNull().default(0),
 }, (t) => [index("rosters_facility_start_idx").on(t.facilityId, t.startDate)]);

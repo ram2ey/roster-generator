@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import { AuthScreen } from "./components/AuthScreen";
 import { BalancePanel } from "./components/BalancePanel";
@@ -10,6 +10,7 @@ import { RosterBoard } from "./components/RosterBoard";
 import { RulesPanel } from "./components/RulesPanel";
 import { StaffPanel } from "./components/StaffPanel";
 import { MONTHS, SHIFT } from "./constants";
+import * as api from "./data/api";
 import { useAuth } from "./hooks/useAuth";
 import { useRosterState } from "./hooks/useRosterState";
 import { monthRange, stepRange } from "./lib/dateUtils";
@@ -120,6 +121,17 @@ export default function App() {
   const auth = useAuth();
   const [{ startDate, endDate }, setPeriod] = useState(todayMonthRange);
   const [tab, setTab] = useState<Tab>("staff");
+  const [billing, setBilling] = useState<{ email: string; legacyUnlimited: boolean; downloadCredits: number } | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const signedInEmail = auth.status === "authed" ? auth.email : null;
+
+  useEffect(() => {
+    if (!signedInEmail) return;
+    let alive = true;
+    const email = signedInEmail;
+    api.getBillingStatus().then((status) => { if (alive) setBilling({ email, ...status }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [signedInEmail]);
 
   const authed = auth.status === "authed";
   const {
@@ -161,7 +173,7 @@ export default function App() {
   }
 
   if (auth.status === "paywall") {
-    return <PaywallScreen email={auth.email} onLogout={auth.logout} onPaid={auth.confirmPaid} />;
+    return <PaywallScreen email={auth.email} onLogout={auth.logout} onPaid={auth.confirmPaid} onBack={auth.dismissPaywall} />;
   }
 
   if (loading || !rules) {
@@ -173,6 +185,18 @@ export default function App() {
   }
 
   const step = (dir: -1 | 1) => setPeriod(stepRange(startDate, endDate, dir));
+  const accountBilling = billing?.email === auth.email ? billing : null;
+
+  const handleDownload = async () => {
+    setDownloadError(null);
+    try {
+      await actions.exportCSV();
+      const status = await api.getBillingStatus();
+      setBilling({ email: auth.email, ...status });
+    } catch (e) {
+      setDownloadError(e instanceof api.ApiError ? e.message : "Could not download the roster. Please try again.");
+    }
+  };
 
   return (
     <div className="app">
@@ -189,6 +213,7 @@ export default function App() {
             {roster ? ` · ${issues.length} issue${issues.length === 1 ? "" : "s"}` : " · not generated"}
             {roster?.edited && <span className="edited"> · edited by hand</span>}
           </p>
+          {accountBilling && <p className="masthead-meta">{accountBilling.legacyUnlimited ? "Lifetime download access" : `${accountBilling.downloadCredits} download credit${accountBilling.downloadCredits === 1 ? "" : "s"} remaining`}</p>}
           <div style={{ marginTop: 8 }}>
             <PeriodPicker startDate={startDate} endDate={endDate} rosters={rosters} onSelect={(s, e) => setPeriod({ startDate: s, endDate: e })} />
           </div>
@@ -198,13 +223,16 @@ export default function App() {
             {roster ? "Generate again" : "Generate roster"}
           </button>
           {roster && (
-            <button type="button" className="btn" onClick={actions.exportCSV}>Download CSV</button>
+            <button type="button" className="btn" onClick={() => { void handleDownload(); }}>Download CSV</button>
           )}
+          {!accountBilling?.legacyUnlimited && <button type="button" className="btn ghost small" onClick={auth.triggerPaywall}>Buy credits</button>}
           <button type="button" className="btn ghost small" onClick={auth.logout}>
             Sign out ({auth.email})
           </button>
         </div>
       </header>
+
+      {downloadError && <p className="notice" role="alert">{downloadError}</p>}
 
       {roster && <IssuesStrip issues={issues} notes={roster.notes} />}
 

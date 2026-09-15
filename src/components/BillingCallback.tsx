@@ -47,7 +47,7 @@ export function BillingCallback({ reference, onSuccess, onFailure }: BillingCall
           <>
             <div className="billing-success-icon">✓</div>
             <h1 className="authcard-title" style={{ marginTop: 16 }}>Payment confirmed!</h1>
-            <p className="panel-note" style={{ marginTop: 8 }}>Your account is now unlocked. Taking you back to the app…</p>
+            <p className="panel-note" style={{ marginTop: 8 }}>Your download credits are ready. Taking you back to the app…</p>
           </>
         )}
         {status === "failed" && (

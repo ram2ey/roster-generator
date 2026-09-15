@@ -96,18 +96,27 @@ export const createRoster = (data: Omit<Roster, "id">) =>
 export const updateRoster = (id: string, data: Omit<Roster, "id" | "startDate" | "endDate">) =>
   request<Roster>(`/api/rosters/${id}`, { method: "PUT", body: JSON.stringify(data) });
 
-// A generation is intentionally separate from a manual roster edit. The
-// server applies the free-tier/paid entitlement only to these actions.
 export const regenerateRoster = (id: string, data: Omit<Roster, "id" | "startDate" | "endDate">) =>
   request<Roster>(`/api/rosters/${id}/generate`, { method: "POST", body: JSON.stringify(data) });
 
+export async function downloadRoster(id: string): Promise<Blob> {
+  const res = await fetch(`/api/rosters/${id}/download`, { method: "POST", credentials: "include" });
+  if (!res.ok) {
+    let message = res.statusText;
+    try { message = ((await res.json()) as { error?: string }).error ?? message; } catch { /* use HTTP status */ }
+    throw new ApiError(res.status, message);
+  }
+  return res.blob();
+}
+
 /* -- Billing ---------------------------------------------------------------- */
 
-export const initiatePayment = () =>
-  request<{ authorizationUrl: string }>("/api/billing/initiate", { method: "POST" });
+export type PackageId = "one" | "six" | "twelve";
+export const initiatePayment = (packageId: PackageId) =>
+  request<{ authorizationUrl: string }>("/api/billing/initiate", { method: "POST", body: JSON.stringify({ packageId }) });
 
 export const verifyPayment = (reference: string) =>
   request<{ ok: boolean }>("/api/billing/verify", { method: "POST", body: JSON.stringify({ reference }) });
 
 export const getBillingStatus = () =>
-  request<{ paid: boolean; generationCount: number; freeGenerationsRemaining: number | null }>("/api/billing/status");
+  request<{ legacyUnlimited: boolean; downloadCredits: number }>("/api/billing/status");

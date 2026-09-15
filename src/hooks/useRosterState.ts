@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CYCLE, isLeaveCode } from "../constants";
 import * as api from "../data/api";
 import { buildDaysInRange } from "../lib/dateUtils";
-import { downloadCSV, toCSV } from "../lib/exporters";
 import { generateRoster } from "../lib/generator";
 import { buildHistory } from "../lib/history";
 import { validate } from "../lib/validation";
@@ -79,26 +78,12 @@ export function useRosterState(
     });
     const body = { grid: next.grid, seed: next.seed, generatedAt: next.generatedAt, edited: next.edited, notes: next.notes };
 
-    try {
-      // Reuse the existing row if this exact period was already saved
-      // (regenerate in place), otherwise create it — don't fork a new row on
-      // every "Generate again".
-      // Keep manual PUT edits separate from an explicit generation. This lets
-      // the server meter every Generate action without charging for a nurse
-      // correcting a cell by hand.
-      if (roster) await api.regenerateRoster(roster.id, body);
-      else await api.createRoster({ startDate, endDate, ...body });
-      await reload();
-    } catch (e) {
-      // 402 from the server means the free generation limit has been reached.
-      // Surface the paywall rather than letting it fall through as a generic error.
-      if (e instanceof api.ApiError && e.status === 402) {
-        onPaywallTriggered();
-      } else {
-        throw e;
-      }
-    }
-  }, [startDate, endDate, staff, rules, leave, holidays, rosters, history, days, roster, reload, onPaywallTriggered]);
+    // Regenerate an existing period in place. Manual edits keep its version;
+    // Generate creates a new version that needs its own download credit.
+    if (roster) await api.regenerateRoster(roster.id, body);
+    else await api.createRoster({ startDate, endDate, ...body });
+    await reload();
+  }, [startDate, endDate, staff, rules, leave, holidays, rosters, history, days, roster, reload]);
 
   const cycleCell = useCallback(async (staffId: string, iso: string) => {
     if (!roster) return;
@@ -116,22 +101,21 @@ export function useRosterState(
     await reload();
   }, [roster, reload]);
 
-  const exportCSV = useCallback(() => {
-    if (!roster || !rules) return;
-    downloadCSV(
-      `roster-${startDate}_${endDate}.csv`,
-      toCSV({
-        hospitalName: rules.hospitalName,
-        wardName: rules.wardName,
-        startDate,
-        endDate,
-        days,
-        staff,
-        grid: roster.grid,
-        supportRanks: rules.supportRanks,
-      }),
-    );
-  }, [roster, rules, days, staff, startDate, endDate]);
+  const exportCSV = useCallback(async () => {
+    if (!roster) return;
+    try {
+      const blob = await api.downloadRoster(roster.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `roster-${startDate}_${endDate}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      if (e instanceof api.ApiError && e.status === 402) onPaywallTriggered();
+      else throw e;
+    }
+  }, [roster, startDate, endDate, onPaywallTriggered]);
 
   const addStaffBulk = useCallback(async (names: string[]) => { await api.addStaffBulk(names); await reload(); }, [reload]);
   const updateStaff = useCallback(

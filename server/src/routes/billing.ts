@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireAuth } from "../auth/plugin.js";
 import { db } from "../db/client.js";
@@ -11,8 +11,12 @@ declare module "fastify" {
   }
 }
 
-// GHS 100.00 expressed in pesewas, Paystack's required minor unit.
-const PRICE_PESEWAS = 10_000;
+const PACKAGES = {
+  one: { amount: 1_000, credits: 1 },
+  six: { amount: 5_000, credits: 6 },
+  twelve: { amount: 10_000, credits: 12 },
+} as const;
+type PackageId = keyof typeof PACKAGES;
 const CURRENCY = "GHS";
 const PAYSTACK_API = "https://api.paystack.co";
 
@@ -20,7 +24,7 @@ interface PaystackTransaction {
   status: string;
   amount: number;
   currency: string;
-  metadata?: { facility_id?: string };
+  metadata?: { facility_id?: string; credits?: number };
 }
 
 async function paystackPost<T>(path: string, body: unknown, secretKey: string): Promise<T> {
@@ -67,18 +71,21 @@ async function verifyAndRecordPayment(reference: string, facilityId?: string): P
   }
   // Metadata is mandatory: the provider transaction must be bound to the
   // facility recorded when this checkout was initialized.
-  if (txn.metadata?.facility_id !== payment.facilityId) {
+  if (txn.metadata?.facility_id !== payment.facilityId || (payment.credits > 0 && txn.metadata?.credits !== payment.credits)) {
     return { ok: false, status: 402, error: "Payment does not belong to this account." };
   }
 
   await db.transaction(async (tx) => {
     // The payment reference is a primary key, so concurrent callback/webhook
     // deliveries serialize on this row and remain idempotent.
-    await tx.update(billingPayments)
+    const recorded = await tx.update(billingPayments)
       .set({ status: "paid", paidAt: new Date() })
-      .where(and(eq(billingPayments.reference, reference), eq(billingPayments.status, "initialized")));
-    await tx.update(facilities)
-      .set({ paid: true, paystackRef: reference })
+      .where(and(eq(billingPayments.reference, reference), eq(billingPayments.status, "initialized")))
+      .returning({ reference: billingPayments.reference });
+    if (recorded.length) await tx.update(facilities)
+      .set(payment.credits === 0
+        ? { paid: true, paystackRef: reference }
+        : { downloadCredits: sql`${facilities.downloadCredits} + ${payment.credits}` })
       .where(eq(facilities.id, payment.facilityId));
   });
   return { ok: true };
@@ -128,24 +135,28 @@ export async function billingWebhookRoutes(app: FastifyInstance) {
 export async function billingRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
-  app.post("/api/billing/initiate", async (request, reply) => {
+  app.post<{ Body: { packageId?: string } }>("/api/billing/initiate", async (request, reply) => {
+    const packageId = request.body?.packageId;
+    if (!packageId || !Object.hasOwn(PACKAGES, packageId)) return reply.code(400).send({ error: "Choose a valid package." });
+    const selected = PACKAGES[packageId as PackageId];
     const account = await db.query.facilities.findFirst({ where: eq(facilities.id, request.facilityId!) });
     if (!account) return reply.code(401).send({ error: "Not authenticated" });
-    if (account.paid) return reply.code(400).send({ error: "This account has already been activated." });
+    if (account.paid) return reply.code(400).send({ error: "This account already has lifetime access." });
 
     try {
       const data = await paystackPost<{ authorization_url: string; reference: string }>("/transaction/initialize", {
         email: account.email,
-        amount: PRICE_PESEWAS,
+        amount: selected.amount,
         currency: CURRENCY,
         callback_url: `${process.env.APP_URL!}/billing/callback`,
-        metadata: { facility_id: account.id, expected_amount: PRICE_PESEWAS },
+        metadata: { facility_id: account.id, credits: selected.credits },
       }, process.env.PAYSTACK_SECRET_KEY!);
 
       await db.insert(billingPayments).values({
         reference: data.reference,
         facilityId: account.id,
-        amount: PRICE_PESEWAS,
+        amount: selected.amount,
+        credits: selected.credits,
         currency: CURRENCY,
       });
       return { authorizationUrl: data.authorization_url };
@@ -166,12 +177,11 @@ export async function billingRoutes(app: FastifyInstance) {
   app.get("/api/billing/status", async (request) => {
     const account = await db.query.facilities.findFirst({
       where: eq(facilities.id, request.facilityId!),
-      columns: { paid: true, generationCount: true },
+      columns: { paid: true, downloadCredits: true },
     });
     return {
-      paid: account?.paid ?? false,
-      generationCount: account?.generationCount ?? 0,
-      freeGenerationsRemaining: account?.paid ? null : Math.max(0, 1 - (account?.generationCount ?? 0)),
+      legacyUnlimited: account?.paid ?? false,
+      downloadCredits: account?.downloadCredits ?? 0,
     };
   });
 }
