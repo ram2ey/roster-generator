@@ -71,5 +71,7 @@ export function useAuth() {
     setState((prev) => prev.status === "paywall" ? { status: "authed", email: prev.email } : prev);
   }, []);
 
-  return { ...state, error, signup, login, logout, triggerPaywall, confirmPaid, dismissPaywall };
+  const confirmAccountDeleted = useCallback(() => setState({ status: "anon" }), []);
+
+  return { ...state, error, signup, login, logout, triggerPaywall, confirmPaid, dismissPaywall, confirmAccountDeleted };
 }

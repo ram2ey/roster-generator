@@ -26,6 +26,7 @@ export function useRosterState(
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const [s, r, l, h, ro] = await Promise.all([
@@ -41,8 +42,12 @@ export function useRosterState(
   useEffect(() => {
     if (!ready) return;
     let alive = true;
+    // oxlint-disable-next-line react/set-state-in-effect -- loading represents this external API synchronization
     setLoading(true);
-    reload().finally(() => { if (alive) setLoading(false); });
+    setLoadError(null);
+    reload()
+      .catch((error) => { if (alive) setLoadError(error instanceof Error ? error.message : "Could not load roster data."); })
+      .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [ready, reload]);
 
@@ -56,7 +61,7 @@ export function useRosterState(
 
   const issues = useMemo(() => {
     if (!roster || !rules) return [];
-    return validate({ grid: roster.grid, days, staff, rules });
+    return validate({ grid: roster.grid, days, staff: staff.filter((person) => person.active), rules });
   }, [roster, staff, rules, days]);
 
   const generate = useCallback(async () => {
@@ -73,7 +78,7 @@ export function useRosterState(
       .sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
 
     const next = generateRoster({
-      days, staff, rules, leave, holidays, prevRoster, history,
+      days, staff: staff.filter((person) => person.active), rules, leave, holidays, prevRoster, history,
       seed: `${startDate}_${endDate}-${Date.now()}`,
     });
     const body = { grid: next.grid, seed: next.seed, generatedAt: next.generatedAt, edited: next.edited, notes: next.notes };
@@ -91,13 +96,7 @@ export function useRosterState(
     if (isLeaveCode(current)) return; // leave is edited in the leave panel
     const idx = current ? CYCLE.indexOf(current) : -1;
     const nextCode = CYCLE[(idx + 1) % CYCLE.length];
-    await api.updateRoster(roster.id, {
-      grid: { ...roster.grid, [staffId]: { ...(roster.grid[staffId] ?? {}), [iso]: nextCode } },
-      seed: roster.seed,
-      generatedAt: roster.generatedAt,
-      edited: true,
-      notes: roster.notes,
-    });
+    await api.updateRosterCell(roster.id, staffId, iso, nextCode as "M" | "A" | "N" | "X" | "H");
     await reload();
   }, [roster, reload]);
 
@@ -140,6 +139,7 @@ export function useRosterState(
 
   return {
     loading,
+    loadError,
     staff,
     rules,
     leave,

@@ -1,9 +1,11 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireAuth } from "../auth/plugin.js";
 import { db } from "../db/client.js";
-import { billingPayments, facilities } from "../db/schema.js";
+import { billingPayments, creditLedger, facilities } from "../db/schema.js";
+import { BILLING_PACKAGES, validatePaystackTransaction, type PackageId, type PaystackTransaction } from "../lib/billing.js";
+import { PackageBodySchema, VerifyPaymentBodySchema } from "../lib/schemas.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -11,27 +13,18 @@ declare module "fastify" {
   }
 }
 
-const PACKAGES = {
-  one: { amount: 1_000, credits: 1 },
-  six: { amount: 5_000, credits: 6 },
-  twelve: { amount: 10_000, credits: 12 },
-} as const;
-type PackageId = keyof typeof PACKAGES;
 const CURRENCY = "GHS";
 const PAYSTACK_API = "https://api.paystack.co";
+const PAYSTACK_TIMEOUT_MS = 10_000;
+const BILLING_RATE_LIMIT = { max: 10, timeWindow: "1 minute" };
 
-interface PaystackTransaction {
-  status: string;
-  amount: number;
-  currency: string;
-  metadata?: { facility_id?: string; credits?: number };
-}
 
 async function paystackPost<T>(path: string, body: unknown, secretKey: string): Promise<T> {
   const res = await fetch(`${PAYSTACK_API}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(PAYSTACK_TIMEOUT_MS),
   });
   const json = (await res.json()) as { status: boolean; message?: string; data?: T };
   if (!res.ok || !json.status || !json.data) throw new Error(json.message ?? "Paystack error");
@@ -39,7 +32,10 @@ async function paystackPost<T>(path: string, body: unknown, secretKey: string): 
 }
 
 async function paystackGet<T>(path: string, secretKey: string): Promise<T> {
-  const res = await fetch(`${PAYSTACK_API}${path}`, { headers: { Authorization: `Bearer ${secretKey}` } });
+  const res = await fetch(`${PAYSTACK_API}${path}`, {
+    headers: { Authorization: `Bearer ${secretKey}` },
+    signal: AbortSignal.timeout(PAYSTACK_TIMEOUT_MS),
+  });
   const json = (await res.json()) as { status: boolean; message?: string; data?: T };
   if (!res.ok || !json.status || !json.data) throw new Error(json.message ?? "Paystack error");
   return json.data;
@@ -65,15 +61,8 @@ async function verifyAndRecordPayment(reference: string, facilityId?: string): P
     return { ok: false, status: 502, error: "Could not verify payment. Please try again or contact support." };
   }
 
-  if (txn.status !== "success") return { ok: false, status: 402, error: "Payment was not successful." };
-  if (txn.amount !== payment.amount || txn.currency !== payment.currency) {
-    return { ok: false, status: 402, error: "Payment amount does not match. Contact support." };
-  }
-  // Metadata is mandatory: the provider transaction must be bound to the
-  // facility recorded when this checkout was initialized.
-  if (txn.metadata?.facility_id !== payment.facilityId || (payment.credits > 0 && txn.metadata?.credits !== payment.credits)) {
-    return { ok: false, status: 402, error: "Payment does not belong to this account." };
-  }
+  const validationError = validatePaystackTransaction(txn, payment);
+  if (validationError) return { ok: false, status: 402, error: validationError };
 
   await db.transaction(async (tx) => {
     // The payment reference is a primary key, so concurrent callback/webhook
@@ -82,11 +71,19 @@ async function verifyAndRecordPayment(reference: string, facilityId?: string): P
       .set({ status: "paid", paidAt: new Date() })
       .where(and(eq(billingPayments.reference, reference), eq(billingPayments.status, "initialized")))
       .returning({ reference: billingPayments.reference });
-    if (recorded.length) await tx.update(facilities)
-      .set(payment.credits === 0
-        ? { paid: true, paystackRef: reference }
-        : { downloadCredits: sql`${facilities.downloadCredits} + ${payment.credits}` })
-      .where(eq(facilities.id, payment.facilityId));
+    if (!recorded.length) return;
+    if (payment.credits === 0) {
+      await tx.update(facilities).set({ paid: true, paystackRef: reference }).where(eq(facilities.id, payment.facilityId));
+      return;
+    }
+    const [balance] = await tx.update(facilities)
+      .set({ downloadCredits: sql`${facilities.downloadCredits} + ${payment.credits}` })
+      .where(eq(facilities.id, payment.facilityId))
+      .returning({ value: facilities.downloadCredits });
+    await tx.insert(creditLedger).values({
+      id: randomUUID(), facilityId: payment.facilityId, delta: payment.credits,
+      balanceAfter: balance.value, kind: "purchase", paymentReference: reference,
+    });
   });
   return { ok: true };
 }
@@ -135,10 +132,12 @@ export async function billingWebhookRoutes(app: FastifyInstance) {
 export async function billingRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
-  app.post<{ Body: { packageId?: string } }>("/api/billing/initiate", async (request, reply) => {
+  app.post<{ Body: { packageId: PackageId } }>("/api/billing/initiate", {
+    config: { rateLimit: BILLING_RATE_LIMIT }, schema: { body: PackageBodySchema },
+  }, async (request, reply) => {
     const packageId = request.body?.packageId;
-    if (!packageId || !Object.hasOwn(PACKAGES, packageId)) return reply.code(400).send({ error: "Choose a valid package." });
-    const selected = PACKAGES[packageId as PackageId];
+    if (!packageId || !Object.hasOwn(BILLING_PACKAGES, packageId)) return reply.code(400).send({ error: "Choose a valid package." });
+    const selected = BILLING_PACKAGES[packageId as PackageId];
     const account = await db.query.facilities.findFirst({ where: eq(facilities.id, request.facilityId!) });
     if (!account) return reply.code(401).send({ error: "Not authenticated" });
     if (account.paid) return reply.code(400).send({ error: "This account already has lifetime access." });
@@ -148,7 +147,7 @@ export async function billingRoutes(app: FastifyInstance) {
         email: account.email,
         amount: selected.amount,
         currency: CURRENCY,
-        callback_url: `${process.env.APP_URL!}/billing/callback`,
+        callback_url: new URL("/billing/callback", process.env.APP_URL!).toString(),
         metadata: { facility_id: account.id, credits: selected.credits },
       }, process.env.PAYSTACK_SECRET_KEY!);
 
@@ -166,7 +165,9 @@ export async function billingRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post<{ Body: { reference?: string } }>("/api/billing/verify", async (request, reply) => {
+  app.post<{ Body: { reference: string } }>("/api/billing/verify", {
+    config: { rateLimit: BILLING_RATE_LIMIT }, schema: { body: VerifyPaymentBodySchema },
+  }, async (request, reply) => {
     const reference = request.body?.reference;
     if (!reference || typeof reference !== "string") return reply.code(400).send({ error: "Missing payment reference." });
     const result = await verifyAndRecordPayment(reference, request.facilityId!);

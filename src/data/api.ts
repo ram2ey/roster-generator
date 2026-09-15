@@ -1,4 +1,4 @@
-import type { Holiday, Leave, Roster, Rules, Staff } from "../types";
+import type { Holiday, Leave, Roster, Rules, ShiftCode, Staff } from "../types";
 
 // Same-origin: the backend serves this app's own static build, so there is
 // no separate API host and no CORS to configure.
@@ -49,6 +49,11 @@ export const logout = () => request<{ ok: true }>("/api/auth/logout", { method: 
 
 export const me = () => request<{ email: string }>("/api/auth/me");
 
+export const exportAccountData = () => request<Record<string, unknown>>("/api/auth/data-export");
+
+export const deleteAccount = (password: string) =>
+  request<{ ok: true }>("/api/auth/account", { method: "DELETE", body: JSON.stringify({ password, confirmation: "DELETE" }) });
+
 /* -- Staff -------------------------------------------------------------- */
 
 export const listStaff = () => request<Staff[]>("/api/staff");
@@ -93,8 +98,8 @@ export const listRosters = () => request<Roster[]>("/api/rosters");
 export const createRoster = (data: Omit<Roster, "id">) =>
   request<Roster>("/api/rosters", { method: "POST", body: JSON.stringify(data) });
 
-export const updateRoster = (id: string, data: Omit<Roster, "id" | "startDate" | "endDate">) =>
-  request<Roster>(`/api/rosters/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const updateRosterCell = (id: string, staffId: string, date: string, code: Exclude<ShiftCode, "AL" | "ML" | "SL">) =>
+  request<Roster>(`/api/rosters/${id}/cells`, { method: "PATCH", body: JSON.stringify({ staffId, date, code }) });
 
 export const regenerateRoster = (id: string, data: Omit<Roster, "id" | "startDate" | "endDate">) =>
   request<Roster>(`/api/rosters/${id}/generate`, { method: "POST", body: JSON.stringify(data) });

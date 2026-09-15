@@ -1,4 +1,5 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 // One row per tenant. There is no visible "ward" concept in the product —
 // a facility is just the account a login belongs to, and every other table
@@ -20,7 +21,18 @@ export const facilities = pgTable("facilities", {
   // Historical generation counter retained for reporting.
   generationCount: integer("generation_count").notNull().default(0),
   downloadCredits: integer("download_credits").notNull().default(0),
-}, (t) => [uniqueIndex("facilities_paystack_ref_unique").on(t.paystackRef)]);
+}, (t) => [
+  uniqueIndex("facilities_paystack_ref_unique").on(t.paystackRef),
+  check("facilities_download_credits_nonnegative", sql`${t.downloadCredits} >= 0`),
+]);
+
+export const sessions = pgTable("sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  facilityId: text("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [index("sessions_facility_idx").on(t.facilityId), index("sessions_expires_idx").on(t.expiresAt)]);
 
 // Each checkout is recorded before the user is redirected to Paystack. This
 // lets callbacks and signed webhooks recover a completed payment even when
@@ -34,7 +46,11 @@ export const billingPayments = pgTable("billing_payments", {
   status: text("status", { enum: ["initialized", "paid"] }).notNull().default("initialized"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
-}, (t) => [index("billing_payments_facility_idx").on(t.facilityId)]);
+}, (t) => [
+  index("billing_payments_facility_idx").on(t.facilityId),
+  check("billing_payments_credits_nonnegative", sql`${t.credits} >= 0`),
+  check("billing_payments_amount_positive", sql`${t.amount} > 0`),
+]);
 
 export const staff = pgTable("staff", {
   id: text("id").primaryKey(),
@@ -103,4 +119,38 @@ export const rosters = pgTable("rosters", {
   notes: jsonb("notes").$type<string[]>().notNull(),
   version: integer("version").notNull().default(1),
   downloadedVersion: integer("downloaded_version").notNull().default(0),
-}, (t) => [index("rosters_facility_start_idx").on(t.facilityId, t.startDate)]);
+}, (t) => [
+  uniqueIndex("rosters_facility_period_unique").on(t.facilityId, t.startDate, t.endDate),
+  index("rosters_facility_start_idx").on(t.facilityId, t.startDate),
+  check("rosters_version_positive", sql`${t.version} > 0`),
+  check("rosters_downloaded_version_nonnegative", sql`${t.downloadedVersion} >= 0`),
+]);
+
+export const rosterExports = pgTable("roster_exports", {
+  id: text("id").primaryKey(),
+  rosterId: text("roster_id").notNull().references(() => rosters.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  csv: text("csv").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("roster_exports_roster_version_unique").on(t.rosterId, t.version),
+  check("roster_exports_version_positive", sql`${t.version} > 0`),
+]);
+
+export const creditLedger = pgTable("credit_ledger", {
+  id: text("id").primaryKey(),
+  facilityId: text("facility_id").notNull().references(() => facilities.id, { onDelete: "cascade" }),
+  delta: integer("delta").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  kind: text("kind", { enum: ["purchase", "download", "adjustment"] }).notNull(),
+  paymentReference: text("payment_reference").references(() => billingPayments.reference, { onDelete: "set null" }),
+  rosterId: text("roster_id").references(() => rosters.id, { onDelete: "set null" }),
+  rosterVersion: integer("roster_version"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("credit_ledger_facility_idx").on(t.facilityId, t.createdAt),
+  uniqueIndex("credit_ledger_payment_unique").on(t.paymentReference),
+  uniqueIndex("credit_ledger_roster_version_unique").on(t.rosterId, t.rosterVersion),
+  check("credit_ledger_delta_nonzero", sql`${t.delta} <> 0`),
+  check("credit_ledger_balance_nonnegative", sql`${t.balanceAfter} >= 0`),
+]);

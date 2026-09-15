@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { clearSessionCookie, setSessionCookie } from "../auth/plugin.js";
+import { clearSessionCookie, issueSession, requireAuth, revokeSession } from "../auth/plugin.js";
 import { hashPassword, verifyPassword } from "../auth/passwords.js";
-import { revokeSessionsFor } from "../auth/session.js";
 import { db } from "../db/client.js";
-import { facilities, rules } from "../db/schema.js";
+import { billingPayments, creditLedger, facilities, holidays, leave, rosterExports, rosters, rules, staff } from "../db/schema.js";
+import { AccountDeleteBodySchema, AuthBodySchema, type AuthBody } from "../lib/schemas.js";
 
 // New accounts start with sensible default staffing rules but zero staff —
 // no seeded placeholder names. The in-charge adds their own real staff.
@@ -39,9 +39,9 @@ const SIGNUP_RATE_LIMIT = { max: 5, timeWindow: "10 minutes" };
 const LOGIN_RATE_LIMIT = { max: 10, timeWindow: "1 minute" };
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post<{ Body: { email?: string; password?: string } }>(
+  app.post<{ Body: AuthBody }>(
     "/api/auth/signup",
-    { config: { rateLimit: SIGNUP_RATE_LIMIT } },
+    { config: { rateLimit: SIGNUP_RATE_LIMIT }, schema: { body: AuthBodySchema } },
     async (request, reply) => {
       const email = request.body?.email?.trim().toLowerCase();
       const password = request.body?.password ?? "";
@@ -61,14 +61,14 @@ export async function authRoutes(app: FastifyInstance) {
         await tx.insert(rules).values({ facilityId: id, ...DEFAULT_RULES });
       });
 
-      setSessionCookie(reply, id);
+      await issueSession(reply, id);
       return { email };
     },
   );
 
-  app.post<{ Body: { email?: string; password?: string } }>(
+  app.post<{ Body: AuthBody }>(
     "/api/auth/login",
-    { config: { rateLimit: LOGIN_RATE_LIMIT } },
+    { config: { rateLimit: LOGIN_RATE_LIMIT }, schema: { body: AuthBodySchema } },
     async (request, reply) => {
       const email = request.body?.email?.trim().toLowerCase();
       const password = request.body?.password ?? "";
@@ -83,13 +83,13 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(401).send({ error: "Incorrect email or password." });
       }
 
-      setSessionCookie(reply, account.id);
+      await issueSession(reply, account.id);
       return { email: account.email };
     },
   );
 
   app.post("/api/auth/logout", async (request, reply) => {
-    if (request.facilityId) revokeSessionsFor(request.facilityId);
+    await revokeSession(request.sessionToken);
     clearSessionCookie(reply);
     return { ok: true };
   });
@@ -99,5 +99,38 @@ export async function authRoutes(app: FastifyInstance) {
     const account = await db.query.facilities.findFirst({ where: eq(facilities.id, request.facilityId) });
     if (!account) return reply.code(401).send({ error: "Not authenticated" });
     return { email: account.email };
+  });
+
+  app.get("/api/auth/data-export", { preHandler: requireAuth }, async (request) => {
+    const facilityId = request.facilityId!;
+    const [account, people, leaveRows, holidayRows, settings, rosterRows, paymentRows, ledgerRows] = await Promise.all([
+      db.query.facilities.findFirst({ where: eq(facilities.id, facilityId), columns: { email: true, createdAt: true, downloadCredits: true, paid: true } }),
+      db.select().from(staff).where(eq(staff.facilityId, facilityId)),
+      db.select().from(leave).where(eq(leave.facilityId, facilityId)),
+      db.select().from(holidays).where(eq(holidays.facilityId, facilityId)),
+      db.query.rules.findFirst({ where: eq(rules.facilityId, facilityId) }),
+      db.select().from(rosters).where(eq(rosters.facilityId, facilityId)),
+      db.select().from(billingPayments).where(eq(billingPayments.facilityId, facilityId)),
+      db.select().from(creditLedger).where(eq(creditLedger.facilityId, facilityId)),
+    ]);
+    const rosterIds = rosterRows.map((roster) => roster.id);
+    const exports = rosterIds.length
+      ? (await Promise.all(rosterIds.map((id) => db.select().from(rosterExports).where(eq(rosterExports.rosterId, id))))).flat()
+      : [];
+    return { exportedAt: new Date().toISOString(), account, staff: people, leave: leaveRows, holidays: holidayRows, rules: settings, rosters: rosterRows, rosterExports: exports, payments: paymentRows, creditLedger: ledgerRows };
+  });
+
+  app.delete<{ Body: { password: string; confirmation: "DELETE" } }>("/api/auth/account", {
+    preHandler: requireAuth,
+    config: { rateLimit: { max: 5, timeWindow: "10 minutes" } },
+    schema: { body: AccountDeleteBodySchema },
+  }, async (request, reply) => {
+    const account = await db.query.facilities.findFirst({ where: eq(facilities.id, request.facilityId!) });
+    if (!account || !(await verifyPassword(request.body.password, account.passwordHash))) {
+      return reply.code(401).send({ error: "Incorrect password." });
+    }
+    await db.delete(facilities).where(eq(facilities.id, account.id));
+    clearSessionCookie(reply);
+    return { ok: true };
   });
 }

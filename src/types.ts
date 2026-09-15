@@ -77,6 +77,8 @@ export interface Roster {
   generatedAt: string;
   edited: boolean;
   notes: string[];
+  version?: number;
+  downloadedVersion?: number;
 }
 
 export interface DayInfo {

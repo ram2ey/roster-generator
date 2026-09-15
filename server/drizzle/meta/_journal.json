@@ -36,6 +36,13 @@
       "when": 1789425000479,
       "tag": "0004_bored_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789452493288,
+      "tag": "0005_fine_mantis",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,8 @@
 # Full-stack image: a Fastify API + Postgres backend serving the built React
-# SPA. Auth-gated, multi-tenant (see server/src/db/schema.ts) — every
-# tenant's data is scoped server-side by the signed session cookie, never by
-# anything the client sends. Requires DATABASE_URL and SESSION_SECRET at
-# runtime (see server/README notes in ROSTER_APP_SPEC.md).
+# SPA. Auth-gated, multi-tenant (see server/src/db/schema.ts): every
+# tenant's data is scoped server-side by an opaque, database-backed session,
+# never by anything the client sends. Runtime configuration is documented in
+# OPERATIONS.md.
 
 FROM node:26-alpine AS frontend-build
 WORKDIR /app
@@ -36,7 +36,7 @@ COPY --chown=node:node server/drizzle ./server/drizzle
 COPY --chown=node:node --from=frontend-build /app/dist ./dist
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/readyz || exit 1
 # node:26-alpine ships a built-in unprivileged "node" user — no reason to
 # run the server as root inside the container.
 USER node

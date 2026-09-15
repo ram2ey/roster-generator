@@ -4,142 +4,80 @@ import type { Holiday, Rules } from "../types";
 interface RulesPanelProps {
   rules: Rules;
   holidays: Holiday[];
-  onUpdateRules: (patch: Partial<Rules>) => void;
-  onAddHoliday: (date: string, name: string) => void;
-  onRemoveHoliday: (id: string) => void;
+  onUpdateRules: (patch: Partial<Rules>) => Promise<void>;
+  onAddHoliday: (date: string, name: string) => Promise<void>;
+  onRemoveHoliday: (id: string) => Promise<void>;
 }
 
+const errorText = (error: unknown) => error instanceof Error ? error.message : "Could not save. Please try again.";
+
 export function RulesPanel({ rules, holidays, onUpdateRules, onAddHoliday, onRemoveHoliday }: RulesPanelProps) {
+  const [draft, setDraft] = useState(rules);
+  const [rankText, setRankText] = useState(rules.supportRanks.join(", "));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const changed = JSON.stringify(draft) !== JSON.stringify(rules);
+
+  const save = async () => {
+    setBusy(true); setError(null);
+    try { await onUpdateRules(draft); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); }
+  };
+
   return (
     <>
       <div className="panel">
-        <h3>Roster header</h3>
-        <p className="panel-note">Printed on the exported roster and used to split staff into the export's two tally groups.</p>
-        <div className="stack" style={{ marginTop: 10 }}>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Hospital name</label>
-            <input
-              className="field" style={{ width: 220 }}
-              value={rules.hospitalName}
-              onChange={(e) => onUpdateRules({ hospitalName: e.target.value })}
-            />
-          </div>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Ward name</label>
-            <input
-              className="field" style={{ width: 220 }}
-              value={rules.wardName}
-              onChange={(e) => onUpdateRules({ wardName: e.target.value })}
-            />
-          </div>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Support-band ranks</label>
-            <SupportRanksField ranks={rules.supportRanks} onUpdate={(supportRanks) => onUpdateRules({ supportRanks })} />
-          </div>
+        <h3>Roster settings</h3>
+        <p className="panel-note">Changes apply to new drafts. Previously downloaded files remain unchanged.</p>
+        <div className="stack">
+          <label className="form-row"><span>Hospital name</span><input className="field" value={draft.hospitalName} maxLength={160} onChange={(e) => setDraft({ ...draft, hospitalName: e.target.value })} /></label>
+          <label className="form-row"><span>Ward name</span><input className="field" value={draft.wardName} maxLength={160} onChange={(e) => setDraft({ ...draft, wardName: e.target.value })} /></label>
+          <label className="form-row"><span>Support-band ranks</span><input className="field" value={rankText} maxLength={500} placeholder="e.g. SUP/HA, WO" onChange={(e) => { const raw = e.target.value; setRankText(raw); setDraft({ ...draft, supportRanks: [...new Set(raw.split(",").map((rank) => rank.trim()).filter(Boolean))] }); }} /></label>
+          <label className="form-row"><span>Least staff on night</span><input className="field number-field" type="number" min={1} max={50} value={draft.minNight} onChange={(e) => setDraft({ ...draft, minNight: Number(e.target.value) })} /></label>
+          <label className="form-row"><span>Least staff on afternoon</span><input className="field number-field" type="number" min={1} max={50} value={draft.minAfternoon} onChange={(e) => setDraft({ ...draft, minAfternoon: Number(e.target.value) })} /></label>
+          <label className="form-row"><span>Days off per week</span><input className="field number-field" type="number" min={0} max={6} value={draft.weeklyOff} onChange={(e) => setDraft({ ...draft, weeklyOff: Number(e.target.value) })} /></label>
+          <label className="checkline"><input type="checkbox" checked={draft.allowTwoMaleNight} onChange={(e) => setDraft({ ...draft, allowTwoMaleNight: e.target.checked })} />Accept a night team of 2 when both are male</label>
+          <button type="button" className="btn primary" disabled={!changed || busy || draft.minNight < 1 || draft.minAfternoon < 1} onClick={() => { void save(); }}>{busy ? "Saving…" : "Save roster settings"}</button>
+          {error && <span className="field-error" role="alert">{error}</span>}
         </div>
-        <p className="panel-note">
-          Staff whose rank matches one of these (comma-separated, e.g. "SUP/HA, WO") get their own
-          section and tally block on the exported roster, after everyone else. Leave blank for one
-          group.
-        </p>
-      </div>
-
-      <div className="panel">
-        <h3>Staffing rules</h3>
-        <div className="stack" style={{ marginTop: 10 }}>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Least staff on night</label>
-            <input
-              className="field" style={{ width: 68 }} type="number" min={1}
-              value={rules.minNight}
-              onChange={(e) => onUpdateRules({ minNight: Number(e.target.value) })}
-            />
-          </div>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Least staff on afternoon</label>
-            <input
-              className="field" style={{ width: 68 }} type="number" min={1}
-              value={rules.minAfternoon}
-              onChange={(e) => onUpdateRules({ minAfternoon: Number(e.target.value) })}
-            />
-          </div>
-          <div className="row tight">
-            <label className="panel-note" style={{ flex: 1, margin: 0 }}>Days off per week</label>
-            <input
-              className="field" style={{ width: 68 }} type="number" min={0} max={4}
-              value={rules.weeklyOff}
-              onChange={(e) => onUpdateRules({ weeklyOff: Number(e.target.value) })}
-            />
-          </div>
-          <label className="checkline">
-            <input
-              type="checkbox"
-              checked={rules.allowTwoMaleNight}
-              onChange={(e) => onUpdateRules({ allowTwoMaleNight: e.target.checked })}
-            />
-            Accept a night team of 2 when both are male
-          </label>
-        </div>
-        <p className="panel-note">
-          Night blocks run {rules.nightBlockLengths.join(" or ")} nights. Three nights earn two days
-          off, four nights earn three. Blocks alternate so the pattern shifts from month to month.
-        </p>
       </div>
 
       <div className="panel">
         <h3>Public holidays</h3>
-        <p className="panel-note">
-          Days marked here show as H instead of X and still count towards the weekly entitlement.
-        </p>
-        <div className="stack">
-          {holidays.map((h) => (
-            <div className="row tight" key={h.id}>
-              <span style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>{h.date}</span>
-              <span style={{ fontSize: 12.5, color: "var(--muted)", flex: 1 }}>{h.name}</span>
-              <button type="button" className="btn danger small" onClick={() => onRemoveHoliday(h.id)}>Remove</button>
-            </div>
-          ))}
-        </div>
+        <p className="panel-note">Days marked here show as H instead of X and count towards weekly entitlement.</p>
+        <div className="stack">{holidays.map((holiday) => <HolidayRow key={holiday.id} holiday={holiday} onRemove={onRemoveHoliday} />)}</div>
         <HolidayAdd onAdd={onAddHoliday} />
       </div>
     </>
   );
 }
 
-function SupportRanksField({ ranks, onUpdate }: { ranks: string[]; onUpdate: (ranks: string[]) => void }) {
-  const [raw, setRaw] = useState(ranks.join(", "));
-  return (
-    <input
-      className="field" style={{ width: 220 }}
-      placeholder="e.g. SUP/HA, WO"
-      value={raw}
-      onChange={(e) => {
-        setRaw(e.target.value);
-        onUpdate(e.target.value.split(",").map((r) => r.trim()).filter(Boolean));
-      }}
-    />
-  );
+function HolidayRow({ holiday, onRemove }: { holiday: Holiday; onRemove: RulesPanelProps["onRemoveHoliday"] }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return <div className="row tight">
+    <span style={{ fontSize: 12.5, fontFamily: "var(--font-mono)" }}>{holiday.date}</span>
+    <span style={{ fontSize: 12.5, color: "var(--muted)", flex: 1 }}>{holiday.name}</span>
+    <button type="button" className="btn danger small" disabled={busy} onClick={() => { setBusy(true); setError(null); void onRemove(holiday.id).catch((cause) => { setError(errorText(cause)); setBusy(false); }); }}>{busy ? "Removing…" : "Remove"}</button>
+    {error && <span className="field-error" role="alert">{error}</span>}
+  </div>;
 }
 
-function HolidayAdd({ onAdd }: { onAdd: (date: string, name: string) => void }) {
+function HolidayAdd({ onAdd }: { onAdd: RulesPanelProps["onAddHoliday"] }) {
   const [date, setDate] = useState("");
   const [name, setName] = useState("");
-  return (
-    <div className="row" style={{ marginTop: 12 }}>
-      <input className="field" style={{ width: 150 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      <input className="field" style={{ width: 150 }} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-      <button
-        type="button"
-        className="btn small"
-        onClick={() => {
-          if (!date) return;
-          onAdd(date, name || "Holiday");
-          setDate("");
-          setName("");
-        }}
-      >
-        Add holiday
-      </button>
-    </div>
-  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!date) return;
+    setBusy(true); setError(null);
+    try { await onAdd(date, name.trim() || "Holiday"); setDate(""); setName(""); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); }
+  };
+  return <div className="stack" style={{ marginTop: 12 }}>
+    <div className="row tight"><input className="field" type="date" value={date} onChange={(e) => setDate(e.target.value)} /><input className="field" maxLength={120} placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} /><button type="button" className="btn small" disabled={!date || busy} onClick={() => { void submit(); }}>{busy ? "Adding…" : "Add holiday"}</button></div>
+    {error && <span className="field-error" role="alert">{error}</span>}
+  </div>;
 }

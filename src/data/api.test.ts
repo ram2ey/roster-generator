@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { removeStaff, updateStaff } from "./api";
+import { removeStaff, updateRosterCell, updateStaff } from "./api";
 
 function mockFetch(status: number, body: unknown = {}) {
   const fn = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -29,5 +29,14 @@ describe("request", () => {
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers(init?.headers);
     expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("uses the constrained cell endpoint for manual roster edits", async () => {
+    const fetchMock = mockFetch(200, {});
+    await updateRosterCell("roster-1", "staff-1", "2026-09-01", "N");
+    const [path, init] = fetchMock.mock.calls[0];
+    expect(path).toBe("/api/rosters/roster-1/cells");
+    expect(init?.method).toBe("PATCH");
+    expect(JSON.parse(String(init?.body))).toEqual({ staffId: "staff-1", date: "2026-09-01", code: "N" });
   });
 });

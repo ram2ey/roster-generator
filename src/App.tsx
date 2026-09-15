@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import { AccountPanel } from "./components/AccountPanel";
 import { AuthScreen } from "./components/AuthScreen";
 import { BalancePanel } from "./components/BalancePanel";
 import { BillingCallback } from "./components/BillingCallback";
@@ -16,13 +17,14 @@ import { useRosterState } from "./hooks/useRosterState";
 import { monthRange, stepRange } from "./lib/dateUtils";
 import type { Roster } from "./types";
 
-type Tab = "staff" | "rules" | "leave" | "balance";
+type Tab = "staff" | "rules" | "leave" | "balance" | "account";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "staff", label: "Staff" },
   { id: "rules", label: "Rules" },
   { id: "leave", label: "Leave" },
   { id: "balance", label: "Workload balance" },
+  { id: "account", label: "Account" },
 ];
 
 function formatDate(iso: string): string {
@@ -58,6 +60,9 @@ function PeriodPicker({
   const [open, setOpen] = useState(false);
   const [customStart, setCustomStart] = useState(startDate);
   const [customEnd, setCustomEnd] = useState(endDate);
+  const customLength = customStart && customEnd
+    ? Math.floor((Date.parse(`${customEnd}T00:00:00Z`) - Date.parse(`${customStart}T00:00:00Z`)) / 86_400_000) + 1
+    : 0;
 
   const saved = [...rosters].sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
 
@@ -107,12 +112,13 @@ function PeriodPicker({
       <button
         type="button"
         className="btn small"
-        disabled={!customStart || !customEnd || customStart > customEnd}
+        disabled={!customStart || !customEnd || customStart > customEnd || customLength > 62}
         onClick={() => { onSelect(customStart, customEnd); setOpen(false); }}
       >
         Use this range
       </button>
       <button type="button" className="btn ghost small" onClick={() => setOpen(false)}>Cancel</button>
+      {customLength > 62 && <span className="field-error" role="alert">Maximum period is 62 days.</span>}
     </div>
   );
 }
@@ -123,19 +129,25 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("staff");
   const [billing, setBilling] = useState<{ email: string; legacyUnlimited: boolean; downloadCredits: number } | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [editingCell, setEditingCell] = useState(false);
   const signedInEmail = auth.status === "authed" ? auth.email : null;
 
   useEffect(() => {
     if (!signedInEmail) return;
     let alive = true;
     const email = signedInEmail;
-    api.getBillingStatus().then((status) => { if (alive) setBilling({ email, ...status }); }).catch(() => {});
+    api.getBillingStatus()
+      .then((status) => { if (alive) setBilling({ email, ...status }); })
+      .catch((error) => { if (alive) setActionError(error instanceof Error ? error.message : "Could not load billing status."); });
     return () => { alive = false; };
   }, [signedInEmail]);
 
   const authed = auth.status === "authed";
   const {
-    loading, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, rosters, actions,
+    loading, loadError, staff, rules, leave, holidays, roster, days, issues, history, monthsOnRecord, rosters, actions,
   } = useRosterState(startDate, endDate, authed, auth.status === "authed" ? auth.triggerPaywall : () => {});
 
   // --- Billing callback: detect return from Paystack redirect ---
@@ -176,7 +188,7 @@ export default function App() {
     return <PaywallScreen email={auth.email} onLogout={auth.logout} onPaid={auth.confirmPaid} onBack={auth.dismissPaywall} />;
   }
 
-  if (loading || !rules) {
+  if (loading) {
     return (
       <div className="app">
         <div className="empty">Loading roster book…</div>
@@ -184,18 +196,38 @@ export default function App() {
     );
   }
 
+  if (!rules) return <div className="app"><div className="notice" role="alert">{loadError ?? "Could not load roster settings."}</div></div>;
+
   const step = (dir: -1 | 1) => setPeriod(stepRange(startDate, endDate, dir));
   const accountBilling = billing?.email === auth.email ? billing : null;
+  const activeStaff = staff.filter((person) => person.active);
 
   const handleDownload = async () => {
     setDownloadError(null);
+    setDownloading(true);
     try {
       await actions.exportCSV();
       const status = await api.getBillingStatus();
       setBilling({ email: auth.email, ...status });
     } catch (e) {
       setDownloadError(e instanceof api.ApiError ? e.message : "Could not download the roster. Please try again.");
-    }
+    } finally { setDownloading(false); }
+  };
+
+  const handleGenerate = async () => {
+    if (roster?.version && roster.downloadedVersion === roster.version && !window.confirm("This roster has already been downloaded. Generating again will create a new version that needs a credit to download. Continue?")) return;
+    setGenerating(true); setActionError(null);
+    try { await actions.generate(); }
+    catch (e) { setActionError(e instanceof api.ApiError ? e.message : "Could not generate the roster. Please try again."); }
+    finally { setGenerating(false); }
+  };
+
+  const handleCellClick = async (staffId: string, date: string) => {
+    if (editingCell) return;
+    setEditingCell(true); setActionError(null);
+    try { await actions.cycleCell(staffId, date); }
+    catch (e) { setActionError(e instanceof api.ApiError ? e.message : "Could not update this shift."); }
+    finally { setEditingCell(false); }
   };
 
   return (
@@ -209,7 +241,7 @@ export default function App() {
             <button type="button" className="masthead-step" onClick={() => step(1)} aria-label="Next period">›</button>
           </div>
           <p className="masthead-meta">
-            {staff.length} staff · {days.length} days · {monthsOnRecord} period{monthsOnRecord === 1 ? "" : "s"} on record
+            {activeStaff.length} active staff · {days.length} days · {monthsOnRecord} period{monthsOnRecord === 1 ? "" : "s"} on record
             {roster ? ` · ${issues.length} issue${issues.length === 1 ? "" : "s"}` : " · not generated"}
             {roster?.edited && <span className="edited"> · edited by hand</span>}
           </p>
@@ -219,11 +251,11 @@ export default function App() {
           </div>
         </div>
         <div className="masthead-actions">
-          <button type="button" className="btn primary" onClick={actions.generate}>
-            {roster ? "Generate again" : "Generate roster"}
+          <button type="button" className="btn primary" disabled={generating || downloading} onClick={() => { void handleGenerate(); }}>
+            {generating ? "Generating…" : roster ? "Generate again" : "Generate roster"}
           </button>
           {roster && (
-            <button type="button" className="btn" onClick={() => { void handleDownload(); }}>Download CSV</button>
+            <button type="button" className="btn" disabled={downloading || generating} onClick={() => { void handleDownload(); }}>{downloading ? "Preparing download…" : "Download CSV"}</button>
           )}
           {!accountBilling?.legacyUnlimited && <button type="button" className="btn ghost small" onClick={auth.triggerPaywall}>Buy credits</button>}
           <button type="button" className="btn ghost small" onClick={auth.logout}>
@@ -233,6 +265,11 @@ export default function App() {
       </header>
 
       {downloadError && <p className="notice" role="alert">{downloadError}</p>}
+      {(actionError || loadError) && <p className="notice" role="alert">{actionError || loadError}</p>}
+
+      {roster?.version && roster.downloadedVersion === roster.version && (
+        <div className="notice subtle">This version has been downloaded. Changing a shift or generating again opens a new draft that will need one credit when downloaded.</div>
+      )}
 
       {roster && <IssuesStrip issues={issues} notes={roster.notes} />}
 
@@ -243,8 +280,8 @@ export default function App() {
       ) : (
         <div style={{ marginTop: 16 }}>
           <RosterBoard
-            staff={staff} days={days} roster={roster} rules={rules} issues={issues}
-            onCellClick={actions.cycleCell}
+            staff={activeStaff} days={days} roster={roster} rules={rules} issues={issues}
+            onCellClick={(staffId, date) => { void handleCellClick(staffId, date); }}
           />
         </div>
       )}
@@ -289,8 +326,9 @@ export default function App() {
           <LeavePanel staff={staff} leave={leave} onAdd={actions.addLeave} onRemove={actions.removeLeave} />
         )}
         {tab === "balance" && (
-          <BalancePanel staff={staff} history={history} roster={roster} />
+          <BalancePanel staff={activeStaff} history={history} roster={roster} />
         )}
+        {tab === "account" && <AccountPanel email={auth.email} onDeleted={auth.confirmAccountDeleted} />}
       </div>
     </div>
   );

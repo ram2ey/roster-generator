@@ -1,38 +1,51 @@
 import cookie from "@fastify/cookie";
+import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { createSessionToken, verifySessionToken } from "./session.js";
+import { createSessionToken, hashSessionToken, isPlausibleSessionToken, sessionExpiry } from "./session.js";
 
-const COOKIE_NAME = "session";
+const cookieName = () => process.env.NODE_ENV === "production" ? "__Host-session" : "session";
 
 declare module "fastify" {
   interface FastifyRequest {
     facilityId: string | null;
+    sessionToken: string | null;
   }
 }
 
-/** Reads the session cookie on every request and resolves it to a
- *  facilityId (or null). Nothing downstream should ever trust a
- *  client-supplied facility/tenant id — this is the only source.
- *
- *  Call this directly (`await setupAuth(app)`), not via `app.register(...)`.
- *  `register` creates an encapsulated child scope in Fastify, and everything
- *  set up in here — the cookie plugin, the facilityId decorator, the
- *  onRequest hook — would then only be visible inside that one scope, not to
- *  the sibling route plugins (authRoutes, staffRoutes, ...) that actually
- *  need it. Calling it as a plain function applies all of it to the same
- *  `app` instance the caller passes in, with no extra scope in between. */
-export async function setupAuth(app: FastifyInstance) {
+type SessionResolver = (token: string) => Promise<string | null>;
+interface SetupAuthOptions { resolver?: SessionResolver }
+
+async function resolveSession(token: string): Promise<string | null> {
+  if (!isPlausibleSessionToken(token)) return null;
+  const [{ db }, { sessions }] = await Promise.all([import("../db/client.js"), import("../db/schema.js")]);
+  const row = await db.query.sessions.findFirst({
+    where: and(
+      eq(sessions.tokenHash, hashSessionToken(token)),
+      isNull(sessions.revokedAt),
+      gt(sessions.expiresAt, new Date()),
+    ),
+    columns: { facilityId: true },
+  });
+  return row?.facilityId ?? null;
+}
+
+/** Applied directly to the root instance so cookie decorators and the auth
+ * hook are visible to every sibling route plugin. */
+export async function setupAuth(app: FastifyInstance, options: SetupAuthOptions = {}) {
+  const resolver = options.resolver ?? resolveSession;
   await app.register(cookie);
-
   app.decorateRequest("facilityId", null);
-
+  app.decorateRequest("sessionToken", null);
   app.addHook("onRequest", async (request) => {
-    request.facilityId = verifySessionToken(request.cookies[COOKIE_NAME]);
+    if (!request.raw.url?.startsWith("/api/")) return;
+    const token = request.cookies[cookieName()];
+    request.sessionToken = isPlausibleSessionToken(token) ? token : null;
+    request.facilityId = request.sessionToken ? await resolver(request.sessionToken) : null;
   });
 }
 
-export function setSessionCookie(reply: FastifyReply, facilityId: string): void {
-  reply.setCookie(COOKIE_NAME, createSessionToken(facilityId), {
+export function setSessionCookie(reply: FastifyReply, token: string): void {
+  reply.setCookie(cookieName(), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -41,12 +54,30 @@ export function setSessionCookie(reply: FastifyReply, facilityId: string): void 
   });
 }
 
+export async function issueSession(reply: FastifyReply, facilityId: string): Promise<void> {
+  const [{ db }, { sessions }] = await Promise.all([import("../db/client.js"), import("../db/schema.js")]);
+  const token = createSessionToken();
+  await db.transaction(async (tx) => {
+    await tx.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+    await tx.insert(sessions).values({ tokenHash: hashSessionToken(token), facilityId, expiresAt: sessionExpiry() });
+  });
+  setSessionCookie(reply, token);
+}
+
+export async function revokeSession(token: string | null): Promise<void> {
+  if (!token) return;
+  const [{ db }, { sessions }] = await Promise.all([import("../db/client.js"), import("../db/schema.js")]);
+  await db.update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.tokenHash, hashSessionToken(token)), isNull(sessions.revokedAt)));
+}
+
 export function clearSessionCookie(reply: FastifyReply): void {
-  reply.clearCookie(COOKIE_NAME, { path: "/" });
+  reply.clearCookie(cookieName(), {
+    path: "/", secure: process.env.NODE_ENV === "production", httpOnly: true, sameSite: "lax",
+  });
 }
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (!request.facilityId) {
-    await reply.code(401).send({ error: "Not authenticated" });
-  }
+  if (!request.facilityId) await reply.code(401).send({ error: "Not authenticated" });
 }
