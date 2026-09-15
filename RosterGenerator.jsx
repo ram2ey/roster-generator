@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 
 /* ============================================================================
- * DUTY ROSTER GENERATOR — single-file prototype
+ * ROSTAAR - single-file prototype
  *
  * Section map (mirrors the production file structure in ROSTER_APP_SPEC.md):
  *   1. constants.js      — shift codes, defaults, seed staff

@@ -56,7 +56,7 @@ export function AuthScreen({ error, onLogin, onSignup }: AuthScreenProps) {
             {error && <p className="authcard-error" role="alert">{error}</p>}
             <button type="submit" className="btn primary" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in to workspace" : "Create free account"}<Icon name="arrow" size={18} /></button>
           </form>
-          <div className="auth-switch">{mode === "login" ? "New to Roster Generator? " : "Already have a workspace? "}<button className="text-button" disabled={busy} onClick={() => setMode(mode === "login" ? "signup" : "login")}>{mode === "login" ? "Create an account" : "Sign in"}</button></div>
+          <div className="auth-switch">{mode === "login" ? "New to Rostaar? " : "Already have a workspace? "}<button className="text-button" disabled={busy} onClick={() => setMode(mode === "login" ? "signup" : "login")}>{mode === "login" ? "Create an account" : "Sign in"}</button></div>
           <p className="auth-footnote"><Icon name="lock" size={14} /> Your team's information stays private.</p>
         </div>
       </main>

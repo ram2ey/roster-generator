@@ -1,4 +1,4 @@
-# Roster Generator operations
+# Rostaar operations
 
 ## Required environment
 

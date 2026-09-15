@@ -26,5 +26,5 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="icon"><path d={paths[name]} /></svg>;
 }
 export function Brand({ light = false }: { light?: boolean }) {
-  return <div className={`brand${light ? " brand-light" : ""}`}><span className="brand-mark"><Icon name="calendar" size={23} /></span><span>Roster<span className="brand-sub">GENERATOR</span></span></div>;
+  return <div className={`brand${light ? " brand-light" : ""}`}><span className="brand-mark"><Icon name="calendar" size={23} /></span><span>Rostaar</span></div>;
 }

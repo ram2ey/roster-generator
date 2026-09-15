@@ -1,4 +1,4 @@
-# Duty Roster Generator — build spec
+# Rostaar build spec
 
 Hand this file plus `RosterGenerator.jsx` to Claude Code. The `.jsx` is a working
 prototype with all the logic in one file; this document says how to split it and
