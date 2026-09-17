@@ -43,6 +43,13 @@
       "when": 1789452493288,
       "tag": "0005_fine_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789657364164,
+      "tag": "0006_last_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

@@ -13,9 +13,12 @@ import "@fontsource/ibm-plex-mono/latin-600.css";
 
 import "./index.css";
 import App from "./App";
+import AdminApp from "./AdminApp";
+
+const RootApp = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/") ? AdminApp : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <RootApp />
   </StrictMode>,
 );

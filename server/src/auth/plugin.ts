@@ -17,15 +17,15 @@ interface SetupAuthOptions { resolver?: SessionResolver }
 
 async function resolveSession(token: string): Promise<string | null> {
   if (!isPlausibleSessionToken(token)) return null;
-  const [{ db }, { sessions }] = await Promise.all([import("../db/client.js"), import("../db/schema.js")]);
-  const row = await db.query.sessions.findFirst({
-    where: and(
+  const [{ db }, { facilities, sessions }] = await Promise.all([import("../db/client.js"), import("../db/schema.js")]);
+  const [row] = await db.select({ facilityId: sessions.facilityId }).from(sessions)
+    .innerJoin(facilities, eq(sessions.facilityId, facilities.id))
+    .where(and(
       eq(sessions.tokenHash, hashSessionToken(token)),
       isNull(sessions.revokedAt),
       gt(sessions.expiresAt, new Date()),
-    ),
-    columns: { facilityId: true },
-  });
+      eq(facilities.status, "active"),
+    ));
   return row?.facilityId ?? null;
 }
 

@@ -21,6 +21,9 @@ export const facilities = pgTable("facilities", {
   // Historical generation counter retained for reporting.
   generationCount: integer("generation_count").notNull().default(0),
   downloadCredits: integer("download_credits").notNull().default(0),
+  status: text("status", { enum: ["active", "suspended"] }).notNull().default("active"),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  suspensionReason: text("suspension_reason"),
 }, (t) => [
   uniqueIndex("facilities_paystack_ref_unique").on(t.paystackRef),
   check("facilities_download_credits_nonnegative", sql`${t.downloadCredits} >= 0`),
@@ -66,6 +69,37 @@ export const staff = pgTable("staff", {
   // rules.supportRanks).
   rank: text("rank").notNull().default(""),
 });
+
+// Platform operators are deliberately separate from facility accounts. An
+// administrator can never become a tenant merely by changing a role flag, and
+// the two session cookies have independent lifecycles and revocation tables.
+export const adminUsers = pgTable("admin_users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const adminSessions = pgTable("admin_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  adminUserId: text("admin_user_id").notNull().references(() => adminUsers.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [index("admin_sessions_user_idx").on(t.adminUserId), index("admin_sessions_expires_idx").on(t.expiresAt)]);
+
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: text("id").primaryKey(),
+  adminUserId: text("admin_user_id").notNull().references(() => adminUsers.id, { onDelete: "restrict" }),
+  facilityId: text("facility_id").references(() => facilities.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("admin_audit_created_idx").on(t.createdAt),
+  index("admin_audit_facility_idx").on(t.facilityId, t.createdAt),
+]);
 
 export const leave = pgTable("leave", {
   id: text("id").primaryKey(),

@@ -16,6 +16,26 @@ The Docker command applies committed Drizzle migrations before starting Fastify.
 
 Deploy database-changing releases with a fresh backup. Do not run more than one deployment migration job against the same database unless the platform serializes releases.
 
+## Platform administration
+
+The internal operations console is served at `/admin` and uses its own users,
+sessions, and cookie. Facility credentials never grant administrator access.
+
+After migration `0006` has been applied, create the first operator from a
+trusted shell. Supply the password through a short-lived environment variable
+so it is not written into shell history:
+
+```powershell
+$env:ROSTAAR_ADMIN_PASSWORD = Read-Host -MaskInput "Admin password"
+npm --prefix server run admin:create -- admin@example.com
+Remove-Item Env:ROSTAAR_ADMIN_PASSWORD
+```
+
+Use a unique password of at least 12 characters. Credit adjustments and account
+status changes require a reason and are written to `admin_audit_log`. Suspending
+a facility revokes all of its active sessions immediately. Do not give database
+or admin-console access to customer support staff unless their duties require it.
+
 `/healthz` reports process liveness. `/readyz` checks PostgreSQL and is used by the container health check.
 
 ## Backup and restore

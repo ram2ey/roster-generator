@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
+    "admin:create": "tsx src/scripts/createAdmin.ts",
     "test:migrations": "tsx src/db/verifyMigrations.ts",
     "test": "vitest run",
     "test:watch": "vitest"

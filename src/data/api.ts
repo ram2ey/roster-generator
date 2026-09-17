@@ -125,3 +125,52 @@ export const verifyPayment = (reference: string) =>
 
 export const getBillingStatus = () =>
   request<{ legacyUnlimited: boolean; downloadCredits: number }>("/api/billing/status");
+
+/* -- Platform administration ---------------------------------------------- */
+
+export interface AdminFacilitySummary {
+  id: string; email: string; createdAt: string; status: "active" | "suspended";
+  suspensionReason: string | null; downloadCredits: number; paid: boolean;
+  generationCount: number; staffCount: number; rosterCount: number; lastRosterAt: string | null;
+}
+
+export interface AdminOverview {
+  facilities: { total: number; active: number; suspended: number };
+  staff: number; rosters: number; downloads: number; revenuePesewas: number;
+  pendingPayments: number; recentSignups: number;
+  latestFacilities: Pick<AdminFacilitySummary, "id" | "email" | "status" | "createdAt">[];
+}
+
+export interface AdminPayment {
+  reference: string; facilityId: string; email?: string; amount: number; credits: number;
+  currency: string; status: "initialized" | "paid"; createdAt: string; paidAt: string | null;
+}
+
+export interface AdminLedgerEntry {
+  id: string; facilityId: string; email?: string; delta: number; balanceAfter: number;
+  kind: "purchase" | "download" | "adjustment"; createdAt: string;
+}
+
+export interface AdminFacilityDetail {
+  facility: { id: string; email: string; createdAt: string; paid: boolean; generationCount: number; downloadCredits: number; status: "active" | "suspended"; suspendedAt: string | null; suspensionReason: string | null };
+  staffCount: number; rosterCount: number; payments: AdminPayment[]; ledger: AdminLedgerEntry[];
+}
+
+export interface AdminAuditEntry {
+  id: string; action: string; details: Record<string, unknown>; createdAt: string;
+  adminEmail: string; facilityId: string | null; facilityEmail: string | null;
+}
+
+export const adminLogin = (email: string, password: string) =>
+  request<{ email: string }>("/api/admin/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+export const adminLogout = () => request<{ ok: true }>("/api/admin/auth/logout", { method: "POST" });
+export const adminMe = () => request<{ email: string }>("/api/admin/auth/me");
+export const adminOverview = () => request<AdminOverview>("/api/admin/overview");
+export const adminFacilities = (search = "") => request<AdminFacilitySummary[]>(`/api/admin/facilities${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+export const adminFacility = (id: string) => request<AdminFacilityDetail>(`/api/admin/facilities/${id}`);
+export const adminSetFacilityStatus = (id: string, status: "active" | "suspended", reason: string) =>
+  request<{ ok: true }>(`/api/admin/facilities/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, reason }) });
+export const adminAdjustCredits = (id: string, delta: number, reason: string) =>
+  request<{ balance: number }>(`/api/admin/facilities/${id}/credits`, { method: "POST", body: JSON.stringify({ delta, reason }) });
+export const adminBilling = () => request<{ payments: AdminPayment[]; ledger: AdminLedgerEntry[] }>("/api/admin/billing");
+export const adminAudit = () => request<AdminAuditEntry[]>("/api/admin/audit");

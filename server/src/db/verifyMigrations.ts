@@ -46,6 +46,15 @@ try {
     uniqueProtected = typeof error === "object" && error !== null && "code" in error && error.code === "23505";
   }
   if (!uniqueProtected) throw new Error("Roster period unique constraint was not enforced");
+  await applyFile("0006_last_the_anarchist.sql");
+  const adminTables = await client<{ table_name: string }[]>`
+    select table_name from information_schema.tables
+    where table_schema = 'public' and table_name in ('admin_users', 'admin_sessions', 'admin_audit_log')`;
+  if (adminTables.length !== 3) throw new Error("Admin tables were not created");
+  const statusColumn = await client<{ column_name: string }[]>`
+    select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'facilities' and column_name = 'status'`;
+  if (statusColumn.length !== 1) throw new Error("Facility status column was not created");
   console.log("Fresh-to-current migration upgrade verified.");
 } finally {
   await client.end();

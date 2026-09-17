@@ -4,9 +4,11 @@ import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyError } from "fastify";
 import { setupAuth } from "./auth/plugin.js";
+import { setupAdminAuth } from "./auth/admin.js";
 import { sql } from "./db/client.js";
 import { configuredTrustProxy, isAllowedRequestOrigin } from "./lib/httpSecurity.js";
 import { authRoutes } from "./routes/auth.js";
+import { adminRoutes } from "./routes/admin.js";
 import { billingRoutes, billingWebhookRoutes } from "./routes/billing.js";
 import { holidayRoutes } from "./routes/holidays.js";
 import { leaveRoutes } from "./routes/leave.js";
@@ -97,6 +99,8 @@ app.setErrorHandler((error: FastifyError, request, reply) => {
 // Not app.register(setupAuth) — see the comment on setupAuth for why that
 // would silently break auth for every other route.
 await setupAuth(app);
+await setupAdminAuth(app);
+await app.register(adminRoutes);
 await app.register(authRoutes);
 await app.register(billingWebhookRoutes);
 await app.register(billingRoutes);
