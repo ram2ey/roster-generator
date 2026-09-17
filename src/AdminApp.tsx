@@ -137,19 +137,19 @@ export default function AdminApp() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => { api.adminMe().then((user) => setAuth({ loading: false, email: user.email })).catch(() => setAuth({ loading: false, email: null })); }, []);
-  const loadFacilities = useCallback((search = "") => { void api.adminFacilities(search).then(setFacilities).catch((reason) => setError(reason.message)); }, []);
+  const loadFacilities = useCallback((search = "") => { void api.adminFacilities(search).then((rows) => { setFacilities(rows); setError(null); }).catch((reason) => setError(reason.message)); }, []);
   useEffect(() => {
     if (!auth.email) return;
-    if (tab === "overview") void api.adminOverview().then(setOverview).catch((reason) => setError(reason.message));
+    if (tab === "overview") void api.adminOverview().then((data) => { setOverview(data); setError(null); }).catch((reason) => setError(reason.message));
     if (tab === "facilities") loadFacilities();
-    if (tab === "billing") void api.adminBilling().then(setBilling).catch((reason) => setError(reason.message));
-    if (tab === "audit") void api.adminAudit().then(setAudit).catch((reason) => setError(reason.message));
+    if (tab === "billing") void api.adminBilling().then((data) => { setBilling(data); setError(null); }).catch((reason) => setError(reason.message));
+    if (tab === "audit") void api.adminAudit().then((data) => { setAudit(data); setError(null); }).catch((reason) => setError(reason.message));
   }, [auth.email, tab, loadFacilities]);
   if (auth.loading) return <div className="loading-screen"><span className="billing-spinner" /><p>Verifying administrator session…</p></div>;
   if (!auth.email) return <AdminLogin onLogin={(email) => setAuth({ loading: false, email })} />;
-  const openFacility = (id: string) => { setOpenId(id); setTab("facilities"); };
+  const openFacility = (id: string) => { setOpenId(id); setError(null); setTab("facilities"); };
   return <div className="admin-workspace">
-    <aside className="admin-sidebar"><Brand light /><div className="admin-console-label"><Icon name="shield" size={17} /> Operations console</div><nav aria-label="Administrator navigation">{NAV.map((item) => <button key={item.id} data-active={tab === item.id} onClick={() => setTab(item.id)}><Icon name={item.icon} size={18} />{item.label}</button>)}</nav><div className="admin-identity"><span className="avatar">{auth.email[0].toUpperCase()}</span><div><strong>{auth.email}</strong><small>Platform administrator</small></div></div><button className="admin-signout" onClick={() => { void api.adminLogout().finally(() => setAuth({ loading: false, email: null })); }}><Icon name="logout" size={16} /> Sign out</button></aside>
+    <aside className="admin-sidebar"><Brand light /><div className="admin-console-label"><Icon name="shield" size={17} /> Operations console</div><nav aria-label="Administrator navigation">{NAV.map((item) => <button key={item.id} data-active={tab === item.id} onClick={() => { setError(null); setTab(item.id); }}><Icon name={item.icon} size={18} />{item.label}</button>)}</nav><div className="admin-identity"><span className="avatar">{auth.email[0].toUpperCase()}</span><div><strong>{auth.email}</strong><small>Platform administrator</small></div></div><button className="admin-signout" onClick={() => { void api.adminLogout().finally(() => setAuth({ loading: false, email: null })); }}><Icon name="logout" size={16} /> Sign out</button></aside>
     <main className="admin-main"><header className="admin-topbar"><div><span>Rostaar / Operations</span><strong>{NAV.find((item) => item.id === tab)?.label}</strong></div><span className="secure-label"><Icon name="lock" size={15} /> Restricted system</span></header><div className="admin-content"><div className="admin-page-title"><div><p className="eyebrow">Platform administration</p><h1>{NAV.find((item) => item.id === tab)?.label}</h1></div>{tab === "facilities" && <button className="btn" onClick={() => loadFacilities()}><Icon name="clock" size={15} /> Refresh</button>}</div>{error && <p className="notice" role="alert">{error}</p>}
       {tab === "overview" && (overview ? <Overview data={overview} openFacility={openFacility} /> : <div className="admin-loading"><span className="billing-spinner" /></div>)}
       {tab === "facilities" && <Facilities rows={facilities} reload={loadFacilities} openId={openId} setOpenId={setOpenId} />}

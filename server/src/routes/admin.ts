@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
-import { and, count, desc, eq, ilike, isNull, sql, sum } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, isNull, sql, sum } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { clearAdminSessionCookie, issueAdminSession, requireAdmin, revokeAdminSession } from "../auth/admin.js";
 import { verifyPassword } from "../auth/passwords.js";
@@ -65,7 +65,10 @@ export async function adminRoutes(app: FastifyInstance) {
       db.select({ value: count() }).from(rosters),
       db.select({ value: count() }).from(rosterExports),
       db.select({ status: billingPayments.status, value: count(), amount: sum(billingPayments.amount) }).from(billingPayments).groupBy(billingPayments.status),
-      db.select({ value: count() }).from(facilities).where(sql`${facilities.createdAt} >= ${since}`),
+      // Use the typed comparison helper so Drizzle applies the timestamp
+      // column encoder. An untyped sql fragment forwards a raw Date to
+      // postgres-js, which rejects it while binding the prepared query.
+      db.select({ value: count() }).from(facilities).where(gte(facilities.createdAt, since)),
       db.select({ id: facilities.id, email: facilities.email, status: facilities.status, createdAt: facilities.createdAt })
         .from(facilities).orderBy(desc(facilities.createdAt)).limit(6),
     ]);
